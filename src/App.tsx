@@ -186,7 +186,7 @@ export default function App() {
             <div className="topbar-heart"><Heart size={15} fill="currentColor" /></div>
             <div>
               <strong>ODIY AI</strong>
-              <span>Sen uchun kichik yordamchi</span>
+              <span>Mehribon • sho‘x • e’tiborli</span>
             </div>
           </div>
 
