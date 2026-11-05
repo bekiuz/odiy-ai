@@ -11,9 +11,6 @@ const json = (data: unknown, status = 200) =>
     headers: { "Cache-Control": "no-store" },
   });
 
-const wait = (milliseconds: number) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
-
 async function askGemini(
   model: string,
   apiKey: string,
@@ -23,6 +20,7 @@ async function askGemini(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
@@ -85,69 +83,79 @@ export default async (request: Request, _context: Context) => {
     parts: [{ text: message.content }],
   }));
 
-  // Primary model is retried once on temporary overload, then the fallback is tried.
+  // Each model gets at most 10 seconds, keeping the entire request below
+  // Netlify's synchronous function execution limit.
   const models = [
-    { name: "gemini-3.8-flash", retries: 1 },
-    { name: "gemini-3.7-flash", retries: 1 },
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash-lite",
   ];
+  let timedOut = false;
 
-  try {
-    for (const model of models) {
-      for (let attempt = 0; attempt <= model.retries; attempt += 1) {
-        const response = await askGemini(model.name, apiKey, contents);
-        const result = await response.json().catch(() => ({}));
+  for (const model of models) {
+    let response: Response;
 
-        if (response.status === 503) {
-          console.warn(
-            `Gemini model ${model.name} is busy (attempt ${attempt + 1}).`,
-          );
-          if (attempt < model.retries) {
-            await wait(1200 * 2 ** attempt);
-            continue;
-          }
-          break;
-        }
-
-        if (!response.ok) {
-          const detail =
-            typeof result?.error?.message === "string"
-              ? result.error.message
-              : "Noma’lum Gemini API xatosi.";
-          console.error("Gemini API error:", response.status, detail);
-          return json(
-            { error: `Gemini API xatosi (${response.status}): ${detail}` },
-            502,
-          );
-        }
-
-        const answer = result?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text ?? "")
-          .join("")
-          .trim();
-
-        if (!answer) {
-          return json(
-            { error: "AI javob qaytara olmadi. Qayta urinib ko‘ring." },
-            502,
-          );
-        }
-
-        return json({ reply: answer, model: model.name });
+    try {
+      response = await askGemini(model, apiKey, contents);
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        timedOut = true;
+        console.warn(`Gemini model ${model} timed out after 10 seconds.`);
+        continue;
       }
+      console.error(`Gemini request failed for ${model}:`, error);
+      continue;
     }
 
+    const result = await response.json().catch(() => null);
+
+    if (response.status === 503) {
+      console.warn(`Gemini model ${model} is temporarily overloaded.`);
+      continue;
+    }
+
+    if (!response.ok) {
+      const detail =
+        typeof result?.error?.message === "string"
+          ? result.error.message
+          : "Noma’lum Gemini API xatosi.";
+      console.error("Gemini API error:", response.status, detail);
+      return json(
+        { error: `Gemini API xatosi (${response.status}): ${detail}` },
+        502,
+      );
+    }
+
+    const answer = result?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? "")
+      .join("")
+      .trim();
+
+    if (!answer) {
+      return json(
+        { error: "AI javob qaytara olmadi. Qayta urinib ko‘ring." },
+        502,
+      );
+    }
+
+    return json({ reply: answer, model });
+  }
+
+  if (timedOut) {
     return json(
       {
         error:
-          "Hozir Gemini modellari band. ODIY AI avtomatik qayta urinib, zaxira modelni ham tekshirdi. Birozdan keyin qayta yuboring.",
+          "Gemini modellari vaqtida javob bermadi. So‘rov xavfsiz to‘xtatildi; birozdan keyin qayta urinib ko‘ring.",
       },
-      503,
-    );
-  } catch (error) {
-    console.error("Chat function error:", error);
-    return json(
-      { error: "Server bilan bog‘lanishda xatolik yuz berdi." },
-      500,
+      504,
     );
   }
+
+  return json(
+    {
+      error:
+        "Hozir Gemini modellari band. Bir nechta zaxira model tekshirildi. Birozdan keyin qayta urinib ko‘ring.",
+    },
+    503,
+  );
 };
