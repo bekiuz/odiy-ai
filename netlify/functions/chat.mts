@@ -141,7 +141,7 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Faqat POST so‘rovi qabul qilinadi." }, 405);
   }
 
-  let body: { messages?: ChatMessage[] };
+  let body: { messages?: ChatMessage[]; memory?: ChatMessage[] };
   try {
     body = await request.json();
   } catch {
@@ -153,21 +153,23 @@ export default async (request: Request, _context: Context) => {
   }
 
   const messages = body.messages.slice(-20);
-  const valid = messages.every(
-    (item) =>
-      item &&
-      (item.role === "user" || item.role === "assistant") &&
-      typeof item.content === "string" &&
-      item.content.trim().length > 0 &&
-      item.content.length <= 4000,
-  );
+  const memory = Array.isArray(body.memory) ? body.memory.slice(-12) : [];
+  const isValidMessage = (item: unknown): item is ChatMessage =>
+    !!item &&
+    typeof item === "object" &&
+    "role" in item &&
+    "content" in item &&
+    ((item as ChatMessage).role === "user" || (item as ChatMessage).role === "assistant") &&
+    typeof (item as ChatMessage).content === "string" &&
+    (item as ChatMessage).content.trim().length > 0 &&
+    (item as ChatMessage).content.length <= 4000;
 
-  if (!valid) {
+  if (!messages.every(isValidMessage) || !memory.every(isValidMessage)) {
     return json({ error: "Xabar formati noto‘g‘ri yoki juda uzun." }, 400);
   }
 
   return json({
-    reply: makeLocalReply(messages),
+    reply: makeLocalReply([...memory, ...messages]),
     mode: "local-personality",
   });
 };
