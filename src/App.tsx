@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { generateLocalAIReply } from "./local-ai";
 import {
   ArrowUp,
   Brain,
@@ -24,6 +23,7 @@ type ChatSession = {
 };
 
 const STORAGE_KEY = "odiy-ai-chat-history-v1";
+const AI_API_URL = "https://bekiuz-ai.bekiuz282.workers.dev/api/chat";
 
 function loadChats(): ChatSession[] {
   try {
@@ -86,7 +86,6 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [aiProgress, setAiProgress] = useState("");
 
   const messages = chats.find((chat) => chat.id === activeChatId)?.messages ?? [];
 
@@ -129,7 +128,6 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      setAiProgress("AI modeli yuklanishga tayyorlanmoqda...");
       const memory = chats
         .filter((chat) => chat.id !== chatId)
         .slice(0, 3)
@@ -148,14 +146,35 @@ export default function App() {
         })),
       ].slice(-20);
 
-      const reply = await generateLocalAIReply(contextMessages, setAiProgress);
+      const response = await fetch(AI_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "odiy", messages: contextMessages }),
+      });
+
+      const rawResponse = await response.text();
+      let data: { ok?: boolean; reply?: string; error?: string; model?: string };
+
+      try {
+        data = JSON.parse(rawResponse) as typeof data;
+      } catch {
+        throw new Error(`AI serveridan noto‘g‘ri javob keldi (HTTP ${response.status}).`);
+      }
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `AI so‘rovi bajarilmadi (HTTP ${response.status}).`);
+      }
+
+      if (typeof data.reply !== "string" || !data.reply.trim()) {
+        throw new Error("AI bo‘sh javob qaytardi.");
+      }
 
       setChats((current) =>
         current.map((chat) =>
           chat.id === chatId
             ? {
                 ...chat,
-                messages: [...chat.messages, { role: "assistant", text: reply }],
+                messages: [...chat.messages, { role: "assistant", text: data.reply as string }],
                 updatedAt: Date.now(),
               }
             : chat
@@ -177,7 +196,6 @@ export default function App() {
       );
     } finally {
       setIsLoading(false);
-      setAiProgress("");
     }
   }
 
@@ -308,7 +326,7 @@ export default function App() {
           </div>
 
           <div className="topbar-right">
-            <span className="beta-pill"><span /> BRAUZER AI</span>
+            <span className="beta-pill"><span /> CLOUD AI</span>
             <button
               className="icon-btn new-chat-icon"
               aria-label="Yangi suhbat"
@@ -402,7 +420,7 @@ export default function App() {
                   </div>
                   <div className="message-content">
                     <span>ODIY AI</span>
-                    <p className="typing-text"><i /><i /><i /> {aiProgress || "ODIY AI javob tayyorlamoqda..."}</p>
+                    <p className="typing-text"><i /><i /><i /> ODIY AI javob tayyorlamoqda...</p>
                   </div>
                 </div>
               )}
