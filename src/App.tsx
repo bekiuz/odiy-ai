@@ -320,7 +320,7 @@ export default function App() {
           </div>
           <p className="disclaimer">
             <Heart size={10} fill="currentColor" />
-            ODIY AI — hozircha sinovdagi oddiy yordamchi.
+            ODDIY AI — hozircha qoidalar asosida ishlaydigan sinov yordamchisi.
           </p>
         </div>
       </section>
