@@ -25,11 +25,11 @@ function findUserName(messages: ChatMessage[]): string | undefined {
   for (const message of [...messages].reverse()) {
     if (message.role !== "user") continue;
     const match = message.content.match(
-      /(?:mening ismim|ismim)\s+([a-zA-ZÀ-žʻ'’-]{2,24})/i,
+      /(?:mening|meni|men)\s+ismim\s+([a-zA-ZÀ-žʻ'’-]{2,24})|(?:ismim)\s+([a-zA-ZÀ-žʻ'’-]{2,24})/i,
     );
-    if (match?.[1]) {
-      return match[1].charAt(0).toLocaleUpperCase("uz-UZ") +
-        match[1].slice(1);
+    const rawName = match?.[1] ?? match?.[2];
+    if (rawName) {
+      return rawName.charAt(0).toLocaleUpperCase("uz-UZ") + rawName.slice(1);
     }
   }
   return undefined;
@@ -50,6 +50,19 @@ function makeLocalReply(messages: ChatMessage[]): string {
   const asksAssistantName = /\b(isming|ismingiz|noming|noming)\b/.test(text) &&
     /\b(nima|kim)\b/.test(text);
   const greeting = /^(salom|assalomu alaykum|alaykum assalom|hello|hi|hey)(\s|$)/.test(text);
+
+  if (/\bmenga\s+(claude|coulde|cloud|klod)\b/.test(text) ||
+      /\b(claude|coulde|cloud|klod)\s+(yoqadi|yaxshi)\b/.test(text)) {
+    return "Claude ham yaxshi yordamchi ekan 😄 Lekin ODIY’ni ham sinab ko‘r — balki o‘zimizning kichkina makonimiz ham yoqib qolar. ❤️ Qaysi jihati senga ko‘proq yoqadi?";
+  }
+
+  if (/\b(meni ismim|mening ismim|ismim)\b/.test(text) &&
+      !/\b(nima|kim)\b/.test(text)) {
+    const introducedName = findUserName(messages);
+    if (introducedName) {
+      return \`Tanishganimdan xursandman, \${introducedName}! ❤️ Ismingni shu suhbat davomida eslab turaman. Nima haqida gaplashamiz?\`;
+    }
+  }
 
   if (asksHow && asksAssistantName) {
     return "Yaxshiman, rahmat! ❤️ Ismim ODIY AI. Men mehribon, biroz sho‘x va hazilkash yordamchingman. Sen-chi, kayfiyating qanday?";
