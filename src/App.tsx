@@ -455,7 +455,7 @@ export default function App() {
           </div>
           <p className="disclaimer">
             <Heart size={10} fill="currentColor" />
-            ODDIY AI — AI modeli brauzeringizda ishlaydi.
+            ODDIY AI — Cloudflare serverida ishlaydigan generativ yordamchi.
           </p>
         </div>
       </section>
