@@ -68,7 +68,6 @@ export default async (request: Request, _context: Context) => {
           },
           contents,
           generationConfig: {
-            temperature: 0.7,
             maxOutputTokens: 1200,
           },
         }),
@@ -78,8 +77,9 @@ export default async (request: Request, _context: Context) => {
     const result = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini API error:", response.status, result?.error?.message);
-      return json({ error: "AI xizmatida vaqtinchalik xatolik yuz berdi." }, 502);
+      const detail = typeof result?.error?.message === "string" ? result.error.message : "Noma’lum Gemini API xatosi.";
+      console.error("Gemini API error:", response.status, detail);
+      return json({ error: `Gemini API xatosi (${response.status}): ${detail}` }, 502);
     }
 
     const answer = result?.candidates?.[0]?.content?.parts
