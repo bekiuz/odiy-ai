@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { generateLocalAIReply } from "./local-ai";
 import {
   ArrowUp,
   Brain,
@@ -85,6 +86,7 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [aiProgress, setAiProgress] = useState("");
 
   const messages = chats.find((chat) => chat.id === activeChatId)?.messages ?? [];
 
@@ -127,50 +129,33 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/.netlify/functions/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: history.map((message) => ({
-            role: message.role,
-            content: message.text,
-          })),
-          memory: chats
-            .filter((chat) => chat.id !== chatId)
-            .slice(0, 3)
-            .reverse()
-            .flatMap((chat) => chat.messages.slice(-4))
-            .slice(-12)
-            .map((message) => ({
-              role: message.role,
-              content: message.text,
-            })),
-        }),
-      });
+      setAiProgress("AI modeli yuklanishga tayyorlanmoqda...");
+      const memory = chats
+        .filter((chat) => chat.id !== chatId)
+        .slice(0, 3)
+        .reverse()
+        .flatMap((chat) => chat.messages.slice(-4))
+        .slice(-12)
+        .map((message) => ({
+          role: message.role,
+          content: message.text,
+        }));
+      const contextMessages = [
+        ...memory,
+        ...history.map((message) => ({
+          role: message.role,
+          content: message.text,
+        })),
+      ].slice(-20);
 
-      const rawResponse = await response.text();
-      let data: { reply?: string; error?: string };
-
-      try {
-        data = JSON.parse(rawResponse) as { reply?: string; error?: string };
-      } catch {
-        throw new Error(`Server javobi noto‘g‘ri formatda (HTTP ${response.status}).`);
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `So‘rov bajarilmadi (HTTP ${response.status}).`);
-      }
-
-      if (typeof data.reply !== "string" || !data.reply.trim()) {
-        throw new Error("Javob matni topilmadi.");
-      }
+      const reply = await generateLocalAIReply(contextMessages, setAiProgress);
 
       setChats((current) =>
         current.map((chat) =>
           chat.id === chatId
             ? {
                 ...chat,
-                messages: [...chat.messages, { role: "assistant", text: data.reply as string }],
+                messages: [...chat.messages, { role: "assistant", text: reply }],
                 updatedAt: Date.now(),
               }
             : chat
@@ -192,6 +177,7 @@ export default function App() {
       );
     } finally {
       setIsLoading(false);
+      setAiProgress("");
     }
   }
 
@@ -322,7 +308,7 @@ export default function App() {
           </div>
 
           <div className="topbar-right">
-            <span className="beta-pill"><span /> SINOV VERSIYASI</span>
+            <span className="beta-pill"><span /> BRAUZER AI</span>
             <button
               className="icon-btn new-chat-icon"
               aria-label="Yangi suhbat"
@@ -416,7 +402,7 @@ export default function App() {
                   </div>
                   <div className="message-content">
                     <span>ODIY AI</span>
-                    <p className="typing-text"><i /><i /><i /> Javob tayyorlanmoqda</p>
+                    <p className="typing-text"><i /><i /><i /> {aiProgress || "ODIY AI javob tayyorlamoqda..."}</p>
                   </div>
                 </div>
               )}
@@ -451,7 +437,7 @@ export default function App() {
           </div>
           <p className="disclaimer">
             <Heart size={10} fill="currentColor" />
-            ODDIY AI — hozircha qoidalar asosida ishlaydigan sinov yordamchisi.
+            ODDIY AI — AI modeli brauzeringizda ishlaydi.
           </p>
         </div>
       </section>
