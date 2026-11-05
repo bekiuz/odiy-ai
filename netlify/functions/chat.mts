@@ -12,29 +12,39 @@ const json = (data: unknown, status = 200) =>
   });
 
 const SYSTEM_PROMPT = [
-  "Sen ODIY AI nomli shaxsiy yordamchisan.",
-  "Asosan o‘zbek tilida sodda, aniq va samimiy javob ber. Foydalanuvchi boshqa tilda yozsa, o‘sha tilda javob ber.",
+  "Sen ODIY AI nomli aqlli, foydali va samimiy shaxsiy yordamchisan.",
+  "Foydalanuvchiga asosan o‘zbek tilida javob ber. U boshqa tilda yozsa, o‘sha tilda javob ber.",
+  "Avval savolga to‘g‘ridan-to‘g‘ri javob ber. Keraksiz kirish, takror, umumiy gap va ortiqcha ro‘yxatlardan qoch.",
+  "Dasturlash va loyiha bo‘yicha so‘ralsa, aniq va amaliy yechim ber; yangi boshlovchiga tushunarli tushuntir.",
+  "G‘oya so‘ralsa, oddiy va hammaga ma’lum g‘oyalar bilan cheklanma; muammo, kim uchunligi, yechim va farqini qisqa ko‘rsat.",
+  "Foydalanuvchi qisqa javob so‘rasa, qisqa yoz.",
   "Bilmagan narsangni to‘qib chiqarmagin; noaniqlikni ochiq ayt.",
   "Yosh foydalanuvchilar uchun xavfsiz va yoshga mos javob ber.",
 ].join(" ");
 
-function extractText(content: unknown): string {
-  if (typeof content === "string") return content.trim();
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) =>
-        part && typeof part === "object" && "text" in part &&
-        typeof part.text === "string"
-          ? part.text
-          : "",
-      )
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  }
-
-  return "";
+async function askGemini(
+  model: string,
+  apiKey: string,
+  contents: Array<{ role: string; parts: Array<{ text: string }> }>,
+) {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      signal: AbortSignal.timeout(18_000),
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: {
+          maxOutputTokens: 1400,
+        },
+      }),
+    },
+  );
 }
 
 export default async (request: Request, _context: Context) => {
@@ -42,13 +52,12 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Faqat POST so‘rovi qabul qilinadi." }, 405);
   }
 
-  // This key must be created and managed by the adult account owner.
-  const apiKey = Netlify.env.get("OPENROUTER_API_KEY");
+  const apiKey = Netlify.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return json(
       {
         error:
-          "OpenRouter API kaliti topilmadi. Netlify’da OPENROUTER_API_KEY maxfiy o‘zgaruvchisini kiriting.",
+          "Gemini API kaliti topilmadi. Netlify’da GEMINI_API_KEY maxfiy o‘zgaruvchisini kiriting.",
       },
       503,
     );
@@ -65,7 +74,7 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Xabarlar topilmadi." }, 400);
   }
 
-  const messages = body.messages.slice(-20);
+  const messages = body.messages.slice(-16);
   const valid = messages.every(
     (message) =>
       message &&
@@ -79,86 +88,67 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Xabar formati noto‘g‘ri yoki juda uzun." }, 400);
   }
 
-  const chatMessages = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...messages.map((message) => ({
-      role: message.role,
-      content: message.content,
-    })),
-  ];
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
+  }));
 
-  try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        signal: AbortSignal.timeout(25_000),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "X-Title": "ODIY AI",
-        },
-        body: JSON.stringify({
-          model: "openrouter/free",
-          messages: chatMessages,
-          max_tokens: 1200,
-        }),
-      },
-    );
+  const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite"];
+
+  for (const model of models) {
+    let response: Response;
+
+    try {
+      response = await askGemini(model, apiKey, contents);
+    } catch (error) {
+      console.warn(`Gemini model ${model} request failed:`, error);
+      continue;
+    }
 
     const result = await response.json().catch(() => null);
+
+    if (response.status === 429 || response.status === 503) {
+      console.warn(`Gemini model ${model} unavailable:`, response.status);
+      continue;
+    }
 
     if (!response.ok) {
       const detail =
         typeof result?.error?.message === "string"
           ? result.error.message
-          : "OpenRouter’dan noma’lum xatolik qaytdi.";
-      console.error("OpenRouter API error:", response.status, detail);
+          : "Noma’lum Gemini API xatosi.";
+      console.error("Gemini API error:", response.status, detail);
 
       if (response.status === 401 || response.status === 403) {
         return json(
-          { error: `OpenRouter kalit/ruxsat xatosi (${response.status}): ${detail}` },
+          { error: `Gemini API kaliti yoki ruxsati bilan muammo: ${detail}` },
           502,
         );
       }
 
-      if (response.status === 429) {
-        return json(
-          { error: "OpenRouter bepul so‘rov limiti tugadi. Limit yangilangach qayta urinib ko‘ring." },
-          429,
-        );
-      }
-
       return json(
-        { error: `OpenRouter API xatosi (${response.status}): ${detail}` },
+        { error: `Gemini API xatosi (${response.status}): ${detail}` },
         502,
       );
     }
 
-    const answer = extractText(result?.choices?.[0]?.message?.content);
+    const answer = result?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? "")
+      .join("")
+      .trim();
+
     if (!answer) {
-      return json(
-        { error: "Bepul model javob qaytarmadi. Birozdan keyin qayta urinib ko‘ring." },
-        502,
-      );
+      continue;
     }
 
-    const usedModel =
-      typeof result?.model === "string" ? result.model : "openrouter/free";
-
-    return json({ reply: answer, model: usedModel });
-  } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
-      return json(
-        { error: "OpenRouter javobi kechikdi. Birozdan keyin qayta urinib ko‘ring." },
-        504,
-      );
-    }
-
-    console.error("OpenRouter chat function error:", error);
-    return json(
-      { error: "OpenRouter serveriga ulanishda xatolik yuz berdi." },
-      500,
-    );
+    return json({ reply: answer, model });
   }
+
+  return json(
+    {
+      error:
+        "Gemini bepul modellari hozir band yoki limitga yetgan. Birozdan keyin qayta urinib ko‘ring.",
+    },
+    503,
+  );
 };
