@@ -11,33 +11,30 @@ const json = (data: unknown, status = 200) =>
     headers: { "Cache-Control": "no-store" },
   });
 
-async function askGemini(
-  model: string,
-  apiKey: string,
-  contents: Array<{ role: string; parts: Array<{ text: string }> }>,
-) {
-  return fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{
-            text: "Sen ODIY AI nomli foydali shaxsiy yordamchisan. Foydalanuvchiga asosan o‘zbek tilida, sodda, aniq va samimiy javob ber. Bilmagan narsangni to‘qib chiqarmagin.",
-          }],
-        },
-        contents,
-        generationConfig: {
-          maxOutputTokens: 1200,
-        },
-      }),
-    },
-  );
+const SYSTEM_INSTRUCTIONS = [
+  "Sen ODIY AI nomli shaxsiy AI yordamchisisan.",
+  "Asosan o‘zbek tilida, sodda, aniq va samimiy javob ber. Foydalanuvchi boshqa tilda yozsa, o‘sha tilda javob ber.",
+  "Bilmagan narsangni to‘qib chiqarmagin; noaniqlikni ochiq ayt.",
+  "Yosh foydalanuvchilar uchun xavfsiz va yoshga mos javob ber.",
+  "O‘ziga zarar yetkazish, zo‘ravonlik, jinsiy mazmun yoki xavfli xatti-harakatlarni batafsil tasvirlama va bunday ishlarni bajarish bo‘yicha ko‘rsatma bermagin.",
+  "Xavfli so‘rov bo‘lsa, muloyim rad et va xavfsizroq yo‘lni taklif qil.",
+].join(" ");
+
+function extractOutputText(result: {
+  output?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
+}) {
+  return (result.output ?? [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) =>
+      (item.content ?? [])
+        .filter((part) => part.type === "output_text")
+        .map((part) => part.text ?? ""),
+    )
+    .join("\n")
+    .trim();
 }
 
 export default async (request: Request, _context: Context) => {
@@ -45,10 +42,13 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Faqat POST so‘rovi qabul qilinadi." }, 405);
   }
 
-  const apiKey = Netlify.env.get("GEMINI_API_KEY");
+  const apiKey = Netlify.env.get("OPENAI_API_KEY");
   if (!apiKey) {
     return json(
-      { error: "AI hozir sozlanmagan. Netlify’da GEMINI_API_KEY kalitini kiriting." },
+      {
+        error:
+          "OpenAI API hali ulanmagan. Netlify’da OPENAI_API_KEY maxfiy o‘zgaruvchisini qo‘shing.",
+      },
       503,
     );
   }
@@ -78,84 +78,81 @@ export default async (request: Request, _context: Context) => {
     return json({ error: "Xabar formati noto‘g‘ri yoki juda uzun." }, 400);
   }
 
-  const contents = messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
-
-  // Each model gets at most 10 seconds, keeping the entire request below
-  // Netlify's synchronous function execution limit.
-  const models = [
-    "gemini-3.8-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
+  const input = [
+    { role: "developer", content: SYSTEM_INSTRUCTIONS },
+    ...messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
   ];
-  let timedOut = false;
 
-  for (const model of models) {
-    let response: Response;
-
-    try {
-      response = await askGemini(model, apiKey, contents);
-    } catch (error) {
-      if (error instanceof Error && error.name === "TimeoutError") {
-        timedOut = true;
-        console.warn(`Gemini model ${model} timed out after 10 seconds.`);
-        continue;
-      }
-      console.error(`Gemini request failed for ${model}:`, error);
-      continue;
-    }
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: AbortSignal.timeout(25_000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-6-astra",
+        instructions: SYSTEM_INSTRUCTIONS,
+        input,
+        max_output_tokens: 1200,
+        store: false,
+      }),
+    });
 
     const result = await response.json().catch(() => null);
-
-    if (response.status === 503) {
-      console.warn(`Gemini model ${model} is temporarily overloaded.`);
-      continue;
-    }
 
     if (!response.ok) {
       const detail =
         typeof result?.error?.message === "string"
           ? result.error.message
-          : "Noma’lum Gemini API xatosi.";
-      console.error("Gemini API error:", response.status, detail);
+          : "OpenAI API’dan noma’lum xatolik qaytdi.";
+      console.error("OpenAI API error:", response.status, detail);
+
+      if (response.status === 401) {
+        return json(
+          { error: "OpenAI API kaliti noto‘g‘ri yoki bekor qilingan. Netlify’dagi OPENAI_API_KEY ni tekshiring." },
+          502,
+        );
+      }
+
+      if (response.status === 429) {
+        return json(
+          { error: "OpenAI API limiti yoki billing balansi yetarli emas. API billing sozlamalarini tekshiring." },
+          429,
+        );
+      }
+
       return json(
-        { error: `Gemini API xatosi (${response.status}): ${detail}` },
+        { error: `OpenAI API xatosi (${response.status}): ${detail}` },
         502,
       );
     }
 
-    const answer = result?.candidates?.[0]?.content?.parts
-      ?.map((part: { text?: string }) => part.text ?? "")
-      .join("")
-      .trim();
-
+    const answer = extractOutputText(result ?? {});
     if (!answer) {
       return json(
-        { error: "AI javob qaytara olmadi. Qayta urinib ko‘ring." },
+        { error: "OpenAI javob qaytarmadi. Birozdan keyin qayta urinib ko‘ring." },
         502,
       );
     }
 
-    return json({ reply: answer, model });
-  }
+    return json({ reply: answer, model: "gpt-6-astra" });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return json(
+        { error: "OpenAI javobi juda kechikdi. Birozdan keyin qayta urinib ko‘ring." },
+        504,
+      );
+    }
 
-  if (timedOut) {
+    console.error("OpenAI chat function error:", error);
     return json(
-      {
-        error:
-          "Gemini modellari vaqtida javob bermadi. So‘rov xavfsiz to‘xtatildi; birozdan keyin qayta urinib ko‘ring.",
-      },
-      504,
+      { error: "OpenAI serveriga ulanishda xatolik yuz berdi." },
+      500,
     );
   }
-
-  return json(
-    {
-      error:
-        "Hozir Gemini modellari band. Bir nechta zaxira model tekshirildi. Birozdan keyin qayta urinib ko‘ring.",
-    },
-    503,
-  );
 };
