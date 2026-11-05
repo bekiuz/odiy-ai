@@ -135,6 +135,15 @@ export default function App() {
             role: message.role,
             content: message.text,
           })),
+          memory: chats
+            .filter((chat) => chat.id !== chatId)
+            .slice(0, 3)
+            .flatMap((chat) => chat.messages.slice(-4))
+            .slice(0, 12)
+            .map((message) => ({
+              role: message.role,
+              content: message.text,
+            })),
         }),
       });
 
