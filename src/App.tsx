@@ -105,7 +105,7 @@ export default function App() {
         messages: nextMessages,
         updatedAt: Date.now(),
       };
-      return [updatedChat, ...current.filter((chat) => chat.id !== chatId)];
+      return [updatedChat, ...current.filter((chat) => chat.id !== chatId)].slice(0, 40);
     });
   }
 
@@ -138,8 +138,9 @@ export default function App() {
           memory: chats
             .filter((chat) => chat.id !== chatId)
             .slice(0, 3)
+            .reverse()
             .flatMap((chat) => chat.messages.slice(-4))
-            .slice(0, 12)
+            .slice(-12)
             .map((message) => ({
               role: message.role,
               content: message.text,
