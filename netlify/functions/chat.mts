@@ -69,7 +69,7 @@ function makeLocalReply(messages: ChatMessage[]): string {
   }
 
   if (greeting) {
-    return `Salom${userName ? `, ${userName}" : ""}! ❤️ ODIY AI shu yerda. Bugun nimalar qilamiz?`;
+    return "Salom" + (userName ? ", " + userName : "") + "! ❤️ ODIY AI shu yerda. Bugun nimalar qilamiz?";
   }
 
   if (/\b(rahmat|raxmat|tashakkur)\b/.test(text)) {
