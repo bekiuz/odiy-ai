@@ -18,8 +18,10 @@ type Message = { role: "user" | "assistant"; text: string };
 const suggestions = [
   "Menga yangi loyiha g‘oyasi ber",
   "Bugungi kunimni rejalashtir",
-  "Murakkab mavzuni sodda tushuntir",
+  "Nima qila olasan?",
 ];
+
+const hearts = ["heart-a", "heart-b", "heart-c", "heart-d", "heart-e", "heart-f", "heart-g", "heart-h"];
 
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,9 +56,7 @@ export default function App() {
       try {
         data = JSON.parse(rawResponse) as { reply?: string; error?: string };
       } catch {
-        throw new Error(
-          `Server javobi noto‘g‘ri formatda (HTTP ${response.status}).`,
-        );
+        throw new Error(`Server javobi noto‘g‘ri formatda (HTTP ${response.status}).`);
       }
 
       if (!response.ok) {
@@ -64,7 +64,7 @@ export default function App() {
       }
 
       if (typeof data.reply !== "string" || !data.reply.trim()) {
-        throw new Error("AI javobida matn topilmadi.");
+        throw new Error("Javob matni topilmadi.");
       }
 
       setMessages((current) => [
@@ -91,13 +91,14 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
+      <div className="heart-wallpaper" aria-hidden="true">
+        {hearts.map((heart) => <span className={heart} key={heart}>♥</span>)}
+      </div>
 
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">
-            <Heart size={19} fill="currentColor" />
+            <Heart size={20} fill="currentColor" />
             <span className="brand-spark">✦</span>
           </div>
           <div className="brand-copy">
@@ -116,7 +117,6 @@ export default function App() {
         <button className="new-chat" onClick={startNewChat}>
           <Plus size={17} />
           <span>Yangi suhbat</span>
-          <span className="new-chat-shortcut">＋</span>
         </button>
 
         <div className="side-label">MENING MAKONIM</div>
@@ -183,7 +183,7 @@ export default function App() {
           </button>
 
           <div className="topbar-brand">
-            <div className="topbar-heart"><Heart size={14} fill="currentColor" /></div>
+            <div className="topbar-heart"><Heart size={15} fill="currentColor" /></div>
             <div>
               <strong>ODIY AI</strong>
               <span>Sen uchun kichik yordamchi</span>
@@ -191,7 +191,7 @@ export default function App() {
           </div>
 
           <div className="topbar-right">
-            <span className="demo-pill"><span /> DEMO REJIMI</span>
+            <span className="beta-pill"><span /> SINOV VERSIYASI</span>
             <button
               className="icon-btn new-chat-icon"
               aria-label="Yangi suhbat"
@@ -211,7 +211,7 @@ export default function App() {
 
               <div className="welcome-emblem">
                 <div className="emblem-glow" />
-                <Heart size={31} fill="currentColor" />
+                <Heart size={34} fill="currentColor" />
                 <span>✦</span>
               </div>
 
@@ -224,19 +224,17 @@ export default function App() {
               </div>
 
               <h1>
-                Salom, <span className="headline-accent">go‘zal fikrlar</span>
-                <br />
-                shu yerdan boshlanadi.
+                Salom, <span className="headline-accent">xush kelibsan!</span>
               </h1>
 
               <p className="welcome-description">
-                O‘yla, izlan, rejalashtir. Kichik g‘oyalaringni katta
-                imkoniyatlarga aylantirish uchun o‘zingga qulay makon.
+                Fikrlaringni yoz, rejalaringni tuz va yangi imkoniyatlarni kashf et.
+                ODIY AI sening kichik raqamli makoning.
               </p>
 
               <div className="welcome-divider">
                 <span />
-                <Heart size={12} fill="currentColor" />
+                <Heart size={13} fill="currentColor" />
                 <span />
               </div>
 
@@ -245,7 +243,7 @@ export default function App() {
                 {suggestions.map((item, index) => (
                   <button key={item} onClick={() => sendMessage(item)}>
                     <span className={`suggestion-icon suggestion-icon-${index + 1}`}>
-                      <Sparkles size={16} />
+                      <Sparkles size={17} />
                     </span>
                     <span>{item}</span>
                     <ArrowUp className="suggestion-arrow" size={15} />
@@ -255,7 +253,7 @@ export default function App() {
 
               <div className="welcome-foot">
                 <span className="foot-heart">♥</span>
-                <span>Shoshilma. Har bir yaxshi ish mehr bilan boshlanadi.</span>
+                <span>Har bir yaxshi g‘oya kichik qadamdan boshlanadi.</span>
                 <span className="foot-heart">♥</span>
               </div>
             </div>
@@ -322,7 +320,7 @@ export default function App() {
           </div>
           <p className="disclaimer">
             <Heart size={10} fill="currentColor" />
-            ODIY AI — sening kichik, iliq raqamli makoning.
+            ODIY AI — hozircha sinovdagi oddiy yordamchi.
           </p>
         </div>
       </section>
