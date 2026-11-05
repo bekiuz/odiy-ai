@@ -16,19 +16,48 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function sendMessage(value = prompt) {
+  async function sendMessage(value = prompt) {
     const clean = value.trim();
-    if (!clean) return;
-    setMessages((current) => [
-      ...current,
-      { role: "user", text: clean },
-      {
-        role: "assistant",
-        text: "Men ODIY AI’man. Hozir interfeys tayyorlanmoqda. Keyingi bosqichda AI modelini ulab, sizga haqiqiy javob beradigan qilamiz.",
-      },
-    ]);
+    if (!clean || isLoading) return;
+
+    const history = [...messages, { role: "user" as const, text: clean }];
+    setMessages(history);
     setPrompt("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/.netlify/functions/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: history.map((message) => ({
+            role: message.role,
+            content: message.text,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "AI bilan bog‘lanib bo‘lmadi.");
+      }
+
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", text: data.reply },
+      ]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Noma’lum xatolik yuz berdi.";
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", text: `Xatolik: ${message}` },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -83,6 +112,12 @@ export default function App() {
                   <div className="message-content"><span>{message.role === "assistant" ? "ODIY AI" : "SIZ"}</span><p>{message.text}</p></div>
                 </div>
               ))}
+              {isLoading && (
+                <div className="message-row assistant">
+                  <div className="message-avatar"><Heart size={15} fill="currentColor" /></div>
+                  <div className="message-content"><span>ODIY AI</span><p>Javob tayyorlayapman...</p></div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -97,7 +132,7 @@ export default function App() {
               placeholder="Nima haqida gaplashamiz?"
               rows={1}
             />
-            <button className="send-btn" onClick={() => sendMessage()} disabled={!prompt.trim()} aria-label="Yuborish"><ArrowUp size={19} /></button>
+            <button className="send-btn" onClick={() => sendMessage()} disabled={!prompt.trim() || isLoading} aria-label="Yuborish"><ArrowUp size={19} /></button>
           </div>
           <p className="disclaimer">ODIY AI hali sinov bosqichida. Muhim ma’lumotlarni tekshirib ko‘ring.</p>
         </div>
