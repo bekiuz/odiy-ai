@@ -39,14 +39,29 @@ export default function App() {
         }),
       });
 
-      const data = await response.json();
+      const rawResponse = await response.text();
+      let data: { reply?: string; error?: string };
+
+      try {
+        data = JSON.parse(rawResponse) as { reply?: string; error?: string };
+      } catch {
+        const contentType = response.headers.get("content-type") || "noma’lum format";
+        throw new Error(
+          `Server JSON o‘rniga boshqa sahifa qaytardi (HTTP ${response.status}, ${contentType}). Netlify chat funksiyasi deployi yoki URL manzilini tekshirish kerak.`,
+        );
+      }
+
       if (!response.ok) {
-        throw new Error(data.error || "AI bilan bog‘lanib bo‘lmadi.");
+        throw new Error(data.error || `AI bilan bog‘lanib bo‘lmadi (HTTP ${response.status}).`);
+      }
+
+      if (typeof data.reply !== "string" || !data.reply.trim()) {
+        throw new Error("Server javobida AI matni topilmadi.");
       }
 
       setMessages((current) => [
         ...current,
-        { role: "assistant", text: data.reply },
+        { role: "assistant", text: data.reply as string },
       ]);
     } catch (error) {
       const message =
