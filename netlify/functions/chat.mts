@@ -60,7 +60,7 @@ function makeLocalReply(messages: ChatMessage[]): string {
       !/\b(nima|kim)\b/.test(text)) {
     const introducedName = findUserName(messages);
     if (introducedName) {
-      return \`Tanishganimdan xursandman, \${introducedName}! ❤️ Ismingni shu suhbat davomida eslab turaman. Nima haqida gaplashamiz?\`;
+      return "Tanishganimdan xursandman, " + introducedName + "! ❤️ Ismingni shu suhbat davomida eslab turaman. Nima haqida gaplashamiz?";
     }
   }
 
