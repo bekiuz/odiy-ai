@@ -117,7 +117,7 @@ export default async (request: Request, _context: Context) => {
 
       if (response.status === 401 || response.status === 403) {
         return json(
-          { error: "OpenRouter API kaliti yoki uning ruxsatlari noto‘g‘ri. Hisob egasi kalitni tekshirsin." },
+          { error: `OpenRouter kalit/ruxsat xatosi (${response.status}): ${detail}` },
           502,
         );
       }
