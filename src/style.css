@@ -150,6 +150,60 @@ button:focus-visible, textarea:focus-visible {
   letter-spacing: .5px;
   white-space: nowrap;
 }
+.history-label { margin-top: 24px; margin-bottom: 9px; }
+
+.chat-history-list {
+  display: grid;
+  gap: 4px;
+  max-height: min(30vh, 260px);
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.chat-history-list::-webkit-scrollbar { width: 4px; }
+.chat-history-list::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(255, 154, 211, .25);
+}
+
+.empty-history {
+  margin: 0;
+  padding: 7px 9px;
+  color: #ad8bab;
+  font-size: 10px;
+}
+
+.history-item {
+  display: flex;
+  width: 100%;
+  min-height: 35px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #c5a4c6;
+  background: transparent;
+  text-align: left;
+  font-size: 10px;
+  cursor: pointer;
+  transition: color .18s, background .18s, border-color .18s;
+}
+
+.history-item svg { flex: 0 0 auto; color: #d78bbd; }
+.history-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-item:hover,
+.history-item.selected {
+  border-color: rgba(255, 176, 220, .17);
+  color: #fff1fa;
+  background: rgba(220, 54, 157, .16);
+}
+
 .sidebar-love-card {
   position: relative;
   display: flex;
