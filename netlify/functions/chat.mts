@@ -15,7 +15,8 @@ function normalize(value: string): string {
   return value
     .toLocaleLowerCase("uz-UZ")
     .replace(/[ʻ’‘´`]/g, "'")
-    .replace(/[!?.,;:()[\]{}"'"]/g, " ")
+    .replace(/[!?.,;:(){}\"']/g, " ")
+    .replace(/[\[\]]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
