@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUp,
   Brain,
@@ -15,6 +15,60 @@ import {
 
 type Message = { role: "user" | "assistant"; text: string };
 
+type ChatSession = {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: number;
+};
+
+const STORAGE_KEY = "odiy-ai-chat-history-v1";
+
+function loadChats(): ChatSession[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((chat): chat is ChatSession =>
+        !!chat &&
+        typeof chat.id === "string" &&
+        typeof chat.title === "string" &&
+        Array.isArray(chat.messages) &&
+        typeof chat.updatedAt === "number" &&
+        chat.messages.every((message: unknown) =>
+          !!message &&
+          typeof message === "object" &&
+          "role" in message &&
+          "text" in message &&
+          ((message as Message).role === "user" || (message as Message).role === "assistant") &&
+          typeof (message as Message).text === "string"
+        )
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+function createChatId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createChatTitle(messages: Message[]): string {
+  const firstUserMessage = messages.find((message) => message.role === "user")?.text;
+  if (!firstUserMessage) return "Yangi suhbat";
+  return firstUserMessage.length > 32
+    ? firstUserMessage.slice(0, 32).trimEnd() + "…"
+    : firstUserMessage;
+}
+
 const suggestions = [
   "Menga yangi loyiha g‘oyasi ber",
   "Bugungi kunimni rejalashtir",
@@ -24,17 +78,51 @@ const suggestions = [
 const hearts = ["heart-a", "heart-b", "heart-c", "heart-d", "heart-e", "heart-f", "heart-g", "heart-h"];
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [chats, setChats] = useState<ChatSession[]>(loadChats);
+  const [activeChatId, setActiveChatId] = useState<string | null>(
+    () => loadChats()[0]?.id ?? null
+  );
   const [prompt, setPrompt] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const messages = chats.find((chat) => chat.id === activeChatId)?.messages ?? [];
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+    } catch {
+      // Browser storage may be unavailable or full; the chat still works for this session.
+    }
+  }, [chats]);
+
+  function saveChatMessages(chatId: string, nextMessages: Message[]) {
+    setChats((current) => {
+      const existing = current.find((chat) => chat.id === chatId);
+      const updatedChat: ChatSession = {
+        id: chatId,
+        title: existing?.title ?? createChatTitle(nextMessages),
+        messages: nextMessages,
+        updatedAt: Date.now(),
+      };
+      return [updatedChat, ...current.filter((chat) => chat.id !== chatId)];
+    });
+  }
+
+  function openChat(chatId: string) {
+    setActiveChatId(chatId);
+    setPrompt("");
+    setSidebarOpen(false);
+  }
 
   async function sendMessage(value = prompt) {
     const clean = value.trim();
     if (!clean || isLoading) return;
 
+    const chatId = activeChatId ?? createChatId();
     const history = [...messages, { role: "user" as const, text: clean }];
-    setMessages(history);
+    setActiveChatId(chatId);
+    saveChatMessages(chatId, history);
     setPrompt("");
     setIsLoading(true);
 
@@ -67,24 +155,38 @@ export default function App() {
         throw new Error("Javob matni topilmadi.");
       }
 
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", text: data.reply as string },
-      ]);
+      setChats((current) =>
+        current.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                messages: [...chat.messages, { role: "assistant", text: data.reply as string }],
+                updatedAt: Date.now(),
+              }
+            : chat
+        )
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Noma’lum xatolik yuz berdi.";
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", text: message },
-      ]);
+      setChats((current) =>
+        current.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                messages: [...chat.messages, { role: "assistant", text: message }],
+                updatedAt: Date.now(),
+              }
+            : chat
+        )
+      );
     } finally {
       setIsLoading(false);
     }
   }
 
   function startNewChat() {
-    setMessages([]);
+    setActiveChatId(null);
     setPrompt("");
     setSidebarOpen(false);
   }
@@ -142,6 +244,25 @@ export default function App() {
             <span className="soon">TEZ KUNDA</span>
           </button>
         </nav>
+
+        <div className="side-label history-label">OXIRGI SUHBATLAR</div>
+        <div className="chat-history-list">
+          {chats.length === 0 ? (
+            <p className="empty-history">Hali suhbat yo‘q</p>
+          ) : (
+            chats.slice(0, 12).map((chat) => (
+              <button
+                className={`history-item ${activeChatId === chat.id ? "selected" : ""}`}
+                key={chat.id}
+                onClick={() => openChat(chat.id)}
+                title={chat.title}
+              >
+                <MessageCircle size={14} />
+                <span>{chat.title}</span>
+              </button>
+            ))
+          )}
+        </div>
 
         <div className="sidebar-love-card">
           <div className="sidebar-love-icon"><Heart size={14} fill="currentColor" /></div>
