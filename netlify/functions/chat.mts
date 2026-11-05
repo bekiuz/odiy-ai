@@ -115,8 +115,9 @@ function makeLocalReply(messages: ChatMessage[]): string {
     return "🌷 Kichik kunlik reja:\n\n1. Bugungi eng muhim vazifani tanla.\n2. Uni 25 daqiqalik qismlarga bo‘l.\n3. Qisqa tanaffus qil.\n4. Qolgan ishlarni muhimligiga qarab bajar.\n5. Kun oxirida natijani ko‘rib chiq.\n\nKichik qadam ham oldinga siljish. ❤️";
   }
 
-  if (/\b(rashk|rashkchimis[a-z]*)\b/.test(text)) {
-    return "Men biroz sho‘x hazil qila olaman 😄 Masalan, boshqa yordamchini sinab ko‘rsang: «Voy, yangi tanish topdingmi?» deyman. Lekin tanloving o‘zingniki — men seni nazorat qilmayman.";
+  if (/\brashk|\brashkimisan|\brashkchimis[a-z]*|\brashk qil[a-z]*/.test(text) ||
+      /\bseni rashk/.test(text)) {
+    return "Men biroz sho‘xman-da! 😄 Boshqa yordamchini maqtab qo‘ysang, hazillashib: «Voy, meni ham unutib qo‘ymadingmi?» deyman. Lekin xohlagan AI’ingni bemalol ishlataver — tanlov o‘zingniki. ❤️";
   }
 
   if (/\b(sen kimsan|o'zing kimsan|o'zing haqingda)\b/.test(text)) {
