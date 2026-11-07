@@ -116,6 +116,18 @@ function AnimeTutor({ character, compact = false, onChange }: { character: Chara
       <div className="tutor-aura" />
       <div className="tutor-spark spark-one">✦</div>
       <div className="tutor-spark spark-two">♡</div>
+      {character === "reya" ? (
+        <video
+          className="anime-video"
+          src={import.meta.env.BASE_URL + "mascot-loop.webm"}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-label="Reya anime ustozining aylanuvchi videosi"
+        />
+      ) : (
       <svg className="anime-figure" viewBox="0 0 300 390" role="img" aria-label={details.name + " 3D anime English tutor"}>
         <defs>
           <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop stopColor={details.hair2}/><stop offset=".55" stopColor={details.hair}/><stop offset="1" stopColor="#100d20"/></linearGradient>
@@ -167,6 +179,7 @@ function AnimeTutor({ character, compact = false, onChange }: { character: Chara
         <path d="M68 145 Q55 168 71 196" fill="none" stroke={details.accent} strokeWidth="5" strokeLinecap="round"/>
         <path d="M229 145 Q245 168 229 196" fill="none" stroke={details.accent} strokeWidth="5" strokeLinecap="round"/>
       </svg>
+      )}
       <div className="tutor-speech">
         <span className="speech-dot" />
         <strong>{details.name}</strong>
