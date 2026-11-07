@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, ArrowRight, AudioLines, Award, BookOpen, BookText, Brain,
-  Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3,
-  Flame, GraduationCap, Headphones, Heart, Home, Languages, Lightbulb,
-  Menu, Mic, MicOff, Play, RotateCcw, Search, Settings, Sparkles, Star,
-  Target, Trophy, Volume2, X, Zap
+  ArrowRight, AudioLines, BookOpen, BookText, Brain,
+  Check, CheckCircle2, ChevronDown, ChevronRight, Clock3,
+  Flame, GraduationCap, Headphones, Heart, Home, Lightbulb,
+  Menu, Mic, MicOff, Play, RotateCcw, Search, Sparkles, Star,
+  Trophy, Volume2, X
 } from "lucide-react";
 
 type Section = "home" | "lessons" | "vocabulary" | "grammar" | "listening" | "speaking" | "tests" | "ielts" | "progress";
@@ -205,6 +205,7 @@ export default function App() {
   const [listeningAnswer, setListeningAnswer] = useState<number | null>(null);
   const [spokenText, setSpokenText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [recognition, setRecognition] = useState<RecognitionLike | null>(null);
   const [activeLesson, setActiveLesson] = useState("present");
   const [lessonDone, setLessonDone] = useState(false);
   const [ieltsTab, setIeltsTab] = useState<"reading" | "listening" | "writing" | "speaking">("reading");
@@ -267,6 +268,7 @@ export default function App() {
     };
     recognition.onend = () => setIsRecording(false);
     try {
+      setRecognition(recognition);
       recognition.start();
       setIsRecording(true);
       setSpokenText("Listening... Speak in English.");
@@ -276,7 +278,10 @@ export default function App() {
     }
   };
 
-  const stopRecognition = () => setIsRecording(false);
+  const stopRecognition = () => {
+    recognition?.stop();
+    setIsRecording(false);
+  };
 
   const titleMap: Record<Section, string> = {
     home: "Bosh sahifa", lessons: "Barcha darslar", vocabulary: "Lug‘at mashqi",
