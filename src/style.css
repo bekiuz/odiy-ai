@@ -195,12 +195,11 @@ button:disabled { opacity: .48; cursor: not-allowed !important; transform: none 
 .online-dot { width: 6px; height: 6px; border-radius: 50%; background: #63dfb6; box-shadow: 0 0 10px #63dfb6; }
 
 /* 3D-style anime tutor scene */
-.tutor-scene { min-height: 290px; flex: 1; position: relative; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; perspective: 900px; }
+.tutor-scene { min-height: 290px; flex: 1; position: relative; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
 .tutor-aura { position: absolute; width: 230px; height: 230px; border-radius: 50%; top: 34px; left: 50%; transform: translateX(-50%); background: radial-gradient(circle, rgba(177, 123, 255, .31), rgba(137, 78, 217, .1) 48%, transparent 72%); filter: blur(5px); }
 .tutor-aura::after { content: ""; position: absolute; inset: 25px; border: 1px solid rgba(206, 172, 255, .12); border-radius: 50%; box-shadow: 0 0 44px rgba(170, 117, 255, .19), inset 0 0 35px rgba(177, 117, 255, .12); }
-.anime-figure { position: relative; z-index: 1; height: 270px; width: 225px; margin-bottom: 1px; transform-style: preserve-3d; transform: rotateY(-7deg) rotateX(2deg); filter: drop-shadow(0 21px 16px rgba(6, 3, 18, .38)); animation: tutor-float 5.2s ease-in-out infinite; }
-.anime-video { position: relative; z-index: 1; width: 225px; height: 270px; margin-bottom: 1px; object-fit: contain; border-radius: 12px; filter: drop-shadow(0 21px 16px rgba(6, 3, 18, .38)); }
-@keyframes tutor-float { 0%, 100% { transform: translateY(2px) rotateY(-7deg) rotateX(2deg); } 50% { transform: translateY(-10px) rotateY(5deg) rotateX(-1deg); } }
+.anime-figure { position: relative; z-index: 1; height: 270px; width: 225px; margin-bottom: 1px; filter: drop-shadow(0 12px 10px rgba(6, 3, 18, .24)); animation: tutor-float-2d 5.2s ease-in-out infinite; }
+@keyframes tutor-float-2d { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-8px); } }
 .tutor-spark { position: absolute; z-index: 2; color: #d0a8ff; font-size: 21px; text-shadow: 0 0 16px #a76aff; animation: spark-float 3s ease-in-out infinite; }
 .spark-one { top: 75px; left: 16%; }
 .spark-two { top: 135px; right: 16%; animation-delay: -1.4s; color: #ff9bd2; }
@@ -418,7 +417,6 @@ button:disabled { opacity: .48; cursor: not-allowed !important; transform: none 
 .speaking-character { height: 162px; margin: -18px -18px 14px; overflow: hidden; border-bottom: 1px solid rgba(178, 151, 230, .12); background: radial-gradient(ellipse at 50% 100%, rgba(152, 104, 226, .22), transparent 70%); }
 .tutor-compact { height: 100%; min-height: 160px; }
 .tutor-compact .anime-figure { height: 185px; width: 145px; }
-.tutor-compact .anime-video { height: 185px; width: 120px; }
 .tutor-compact .tutor-aura { width: 150px; height: 150px; top: 8px; }
 .tutor-compact .tutor-speech { top: 32px; right: 17px; width: 123px; }
 .speaking-card > h2 { margin: 9px 0 8px; font: 700 18px Manrope; }
@@ -500,7 +498,6 @@ button:disabled { opacity: .48; cursor: not-allowed !important; transform: none 
   .tutor-card { min-height: 315px; }
   .tutor-scene { min-height: 264px; }
   .anime-figure { height: 248px; }
-  .anime-video { height: 248px; width: 160px; }
   .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lower-grid, .grammar-layout, .speaking-layout { grid-template-columns: 1fr; }
   .search-box { width: 170px; }
