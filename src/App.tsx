@@ -26,11 +26,11 @@ const STORAGE_KEY = "odiy-english-progress-v1";
 const initialProgress: Progress = { name: "O‘quvchi", completed: [], xp: 245, streak: 7, words: 36, level: "A2 — Elementary" };
 
 const modules: Array<{ id: Section; title: string; subtitle: string; icon: typeof BookOpen; color: string; count: string }> = [
-  { id: "vocabulary", title: "Lug‘at", subtitle: "Yangi so‘zlar va iboralar", icon: BookText, color: "pink", count: "12 ta so‘z" },
-  { id: "grammar", title: "Grammatika", subtitle: "Qoidalar va mashqlar", icon: Brain, color: "mint", count: "8 ta mavzu" },
-  { id: "speaking", title: "Speaking", subtitle: "Gapirish va talaffuz", icon: Mic, color: "blue", count: "5 mashq" },
-  { id: "listening", title: "Listening", subtitle: "Tinglab tushunish", icon: Headphones, color: "orange", count: "6 audio" },
-  { id: "tests", title: "Testlar", subtitle: "Bilimingizni tekshiring", icon: CheckCircle2, color: "violet", count: "20 savol" },
+  { id: "vocabulary", title: "Lug‘at", subtitle: "Yangi so‘zlar va iboralar", icon: BookText, color: "pink", count: "6 ta so‘z" },
+  { id: "grammar", title: "Grammatika", subtitle: "Qoidalar va mashqlar", icon: Brain, color: "mint", count: "1 ta mavzu" },
+  { id: "speaking", title: "Speaking", subtitle: "Gapirish va talaffuz", icon: Mic, color: "blue", count: "4 mashq" },
+  { id: "listening", title: "Listening", subtitle: "Tinglab tushunish", icon: Headphones, color: "orange", count: "1 audio" },
+  { id: "tests", title: "Testlar", subtitle: "Bilimingizni tekshiring", icon: CheckCircle2, color: "violet", count: "5 savol" },
   { id: "ielts", title: "IELTS", subtitle: "Imtihonga tayyorgarlik", icon: GraduationCap, color: "gold", count: "4 skill" },
 ];
 
