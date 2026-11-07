@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 
 type Section = "home" | "lessons" | "vocabulary" | "grammar" | "listening" | "speaking" | "tests" | "ielts" | "progress";
-type Character = "reya" | "mika" | "yuki";
 type Progress = { name: string; completed: string[]; xp: number; streak: number; words: number; level: string };
 
 type RecognitionLike = {
@@ -105,86 +104,6 @@ function speakEnglish(text: string) {
   return true;
 }
 
-function AnimeTutor({ character, compact = false, onChange }: { character: Character; compact?: boolean; onChange?: (value: Character) => void }) {
-  const details = {
-    reya: { name: "Reya", hair: "#27153f", hair2: "#7040a9", eyes: "#87d6ff", accent: "#b889ff", greeting: "Hey! Bugun birga inglizcha gaplashamizmi?" },
-    mika: { name: "Mika", hair: "#6b2449", hair2: "#d46b9a", eyes: "#8de5d0", accent: "#ff8ab7", greeting: "Hi! Let’s make English fun!" },
-    yuki: { name: "Yuki", hair: "#55566f", hair2: "#c6d0ee", eyes: "#82cfff", accent: "#9dbfff", greeting: "Hello! Ready for a new lesson?" },
-  }[character];
-  return (
-    <div className={"tutor-scene " + (compact ? "tutor-compact" : "")}>
-      <div className="tutor-aura" />
-      <div className="tutor-spark spark-one">✦</div>
-      <div className="tutor-spark spark-two">♡</div>
-      <svg className="anime-figure" viewBox="0 0 300 390" role="img" aria-label={details.name + " 3D anime English tutor"}>
-        <defs>
-          <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop stopColor={details.hair2}/><stop offset=".55" stopColor={details.hair}/><stop offset="1" stopColor="#100d20"/></linearGradient>
-          <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ffe8dc"/><stop offset=".65" stopColor="#f2bda9"/><stop offset="1" stopColor="#c98582"/></linearGradient>
-          <linearGradient id="coat" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#554078"/><stop offset=".55" stopColor="#26213e"/><stop offset="1" stopColor="#151328"/></linearGradient>
-          <radialGradient id="shine"><stop stopColor="#fff" stopOpacity=".9"/><stop offset="1" stopColor="#fff" stopOpacity="0"/></radialGradient>
-          <filter id="drop"><feGaussianBlur stdDeviation="8"/></filter>
-        </defs>
-        <ellipse cx="150" cy="365" rx="92" ry="13" fill="#080514" opacity=".45" filter="url(#drop)"/>
-        <path d="M55 390 Q55 313 93 294 L124 278 L176 278 L213 295 Q253 322 251 390Z" fill="url(#coat)" stroke="#8c6fbd" strokeOpacity=".7" strokeWidth="2"/>
-        <path d="M119 283 L150 330 L180 283 L166 269 L135 269Z" fill="#fff0ec"/>
-        <path d="M139 292 L150 328 L162 292 L151 300Z" fill={details.accent}/>
-        <path d="M91 326 Q75 350 84 390 L55 390 Q55 337 91 326Z" fill="#171327"/>
-        <path d="M209 326 Q228 351 216 390 L249 390 Q246 338 209 326Z" fill="#171327"/>
-        <path d="M120 245 L119 284 Q149 310 182 284 L180 246Z" fill="url(#skin)"/>
-        <ellipse cx="91" cy="175" rx="18" ry="28" fill="#eeb7a7"/>
-        <ellipse cx="209" cy="175" rx="18" ry="28" fill="#d99791"/>
-        <path d="M80 128 Q82 49 151 46 Q222 47 222 132 L215 217 Q202 260 150 268 Q98 260 84 217Z" fill="url(#skin)" stroke="#d69b92" strokeWidth="1.5"/>
-        <path d="M80 160 Q53 67 125 33 Q198 0 231 75 Q245 112 224 178 L211 129 Q203 89 168 83 Q128 100 92 92Z" fill="url(#hair)" stroke={details.hair2} strokeWidth="3"/>
-        <path d="M84 138 Q72 197 97 258 Q63 250 53 209 Q38 149 69 102Z" fill="url(#hair)"/>
-        <path d="M217 132 Q232 187 204 262 Q245 247 253 199 Q261 149 231 105Z" fill="url(#hair)"/>
-        <path d="M84 111 Q111 43 160 55 Q192 40 220 104 Q187 88 162 111 Q128 87 84 126Z" fill="url(#hair)"/>
-        <path d="M112 66 Q127 102 121 147 Q108 129 103 116Z" fill={details.hair2} opacity=".8"/>
-        <path d="M146 52 Q161 92 148 139 Q136 116 137 80Z" fill={details.hair2} opacity=".65"/>
-        <path d="M178 55 Q197 91 189 129 Q177 115 172 88Z" fill={details.hair2} opacity=".55"/>
-        <path d="M93 139 Q117 115 143 135 Q125 149 103 145Z" fill="#251a35"/>
-        <path d="M159 135 Q189 115 207 139 Q184 148 163 145Z" fill="#251a35"/>
-        <ellipse cx="122" cy="165" rx="18" ry="15" fill="#fff"/>
-        <ellipse cx="181" cy="165" rx="18" ry="15" fill="#fff"/>
-        <ellipse cx="124" cy="169" rx="10" ry="13" fill={details.eyes}/>
-        <ellipse cx="180" cy="169" rx="10" ry="13" fill={details.eyes}/>
-        <ellipse cx="125" cy="171" rx="5" ry="8" fill="#242039"/>
-        <ellipse cx="180" cy="171" rx="5" ry="8" fill="#242039"/>
-        <circle cx="128" cy="164" r="4" fill="#fff"/>
-        <circle cx="184" cy="164" r="4" fill="#fff"/>
-        <path d="M104 145 Q122 135 139 144" fill="none" stroke="#3d2941" strokeWidth="5" strokeLinecap="round"/>
-        <path d="M164 144 Q183 134 199 145" fill="none" stroke="#3d2941" strokeWidth="5" strokeLinecap="round"/>
-        <path d="M149 178 Q144 190 151 191" fill="none" stroke="#d28f89" strokeWidth="2" strokeLinecap="round"/>
-        <path d="M132 211 Q151 225 171 209 Q155 235 137 218Z" fill="#a94762"/>
-        <path d="M135 210 Q152 216 169 209" fill="none" stroke="#fff0ec" strokeWidth="3" strokeLinecap="round"/>
-        <ellipse cx="106" cy="197" rx="15" ry="7" fill="#ff91a9" opacity=".28"/>
-        <ellipse cx="196" cy="197" rx="15" ry="7" fill="#ff91a9" opacity=".28"/>
-        <path d="M84 121 Q94 75 126 62" fill="none" stroke="#fff" strokeOpacity=".35" strokeWidth="6" strokeLinecap="round"/>
-        <path d="M201 91 Q222 119 220 154" fill="none" stroke={details.accent} strokeOpacity=".7" strokeWidth="4" strokeLinecap="round"/>
-        <path d="M142 259 Q150 267 159 259 L157 279 Q150 286 143 278Z" fill="#2b1b32"/>
-        <path d="M145 267 L155 267 L150 276Z" fill={details.accent}/>
-        <path d="M116 292 L150 340 L184 292" fill="none" stroke="#9c88c6" strokeWidth="2" opacity=".5"/>
-        <circle cx="201" cy="105" r="9" fill={details.accent} stroke="#fff" strokeOpacity=".65" strokeWidth="2"/>
-        <path d="M68 145 Q55 168 71 196" fill="none" stroke={details.accent} strokeWidth="5" strokeLinecap="round"/>
-        <path d="M229 145 Q245 168 229 196" fill="none" stroke={details.accent} strokeWidth="5" strokeLinecap="round"/>
-      </svg>
-      <div className="tutor-speech">
-        <span className="speech-dot" />
-        <strong>{details.name}</strong>
-        <p>{details.greeting}</p>
-      </div>
-      {onChange && (
-        <div className="character-picker">
-          {(["reya", "mika", "yuki"] as Character[]).map((item) => (
-            <button key={item} className={character === item ? "active" : ""} onClick={() => onChange(item)}>
-              {item === "reya" ? "Reya" : item === "mika" ? "Mika" : "Yuki"}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ProgressBar({ value, color = "purple" }: { value: number; color?: string }) {
   return <div className="progress-track"><span className={"progress-fill " + color} style={{ width: Math.max(0, Math.min(100, value)) + "%" }} /></div>;
 }
@@ -192,7 +111,6 @@ function ProgressBar({ value, color = "purple" }: { value: number; color?: strin
 export default function App() {
   const [section, setSection] = useState<Section>("home");
   const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [character, setCharacter] = useState<Character>("reya");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
   const [showTranslation, setShowTranslation] = useState(false);
@@ -237,15 +155,15 @@ export default function App() {
   };
 
   const navItems: Array<{ id: Section; label: string; icon: typeof Home }> = [
-    { id: "home", label: "Bosh sahifa", icon: Home },
-    { id: "lessons", label: "Darslar", icon: BookOpen },
-    { id: "vocabulary", label: "Lug‘at", icon: BookText },
-    { id: "grammar", label: "Grammatika", icon: Brain },
+    { id: "home", label: "Dashboard", icon: Home },
+    { id: "lessons", label: "O‘quv rejasi", icon: BookOpen },
+    { id: "ielts", label: "Mock tests", icon: GraduationCap },
+    { id: "vocabulary", label: "Vocabulary", icon: BookText },
+    { id: "grammar", label: "Grammar", icon: Brain },
     { id: "listening", label: "Listening", icon: Headphones },
     { id: "speaking", label: "Speaking", icon: Mic },
-    { id: "tests", label: "Testlar", icon: CheckCircle2 },
-    { id: "ielts", label: "IELTS", icon: GraduationCap },
-    { id: "progress", label: "Natijalar", icon: Trophy },
+    { id: "tests", label: "Quick tests", icon: CheckCircle2 },
+    { id: "progress", label: "Statistika", icon: Trophy },
   ];
 
   const startRecognition = () => {
@@ -334,17 +252,49 @@ export default function App() {
             <>
               <div className="welcome-grid">
                 <div className="welcome-copy">
-                  <span className="eyebrow"><span /> YOUR ENGLISH JOURNEY</span>
-                  <h1>Har kuni ozgina,<br /><span>katta natija.</span></h1>
-                  <p>Ingliz tilini zerikmasdan, bosqichma-bosqich o‘rgan. ODIY sen bilan har qadamda.</p>
-                  <div className="welcome-buttons"><button className="primary-button" onClick={() => changeSection("lessons")}>Darsni boshlash <ArrowRight size={17} /></button><button className="soft-button" onClick={() => changeSection("ielts")}>IELTS tayyorgarlik</button></div>
-                  <div className="welcome-metrics"><div><strong>{progress.words}</strong><span>o‘rganilgan so‘z</span></div><div><strong>{progress.completed.length}</strong><span>tugallangan dars</span></div><div><strong>{progress.streak}</strong><span>kunlik seriya</span></div></div>
+                  <span className="eyebrow"><span /> ODIY ENGLISH • IELTS PREP</span>
+                  <h1>IELTS maqsadingga<br /><span>ishonch bilan bor.</span></h1>
+                  <p>Listening, Reading, Writing va Speaking mashqlarini bir joyda bajar. Rejangni kuzat va har kuni oz-ozdan rivojlan.</p>
+                  <div className="welcome-buttons">
+                    <button className="primary-button" onClick={() => changeSection("ielts")}>Mock testni boshlash <ArrowRight size={17} /></button>
+                    <button className="soft-button" onClick={() => changeSection("lessons")}>O‘quv rejam</button>
+                  </div>
+                  <div className="welcome-metrics">
+                    <div><strong>{progress.words}</strong><span>o‘rganilgan so‘z</span></div>
+                    <div><strong>{progress.completed.length}</strong><span>bajarilgan mashq</span></div>
+                    <div><strong>{progress.streak}</strong><span>kunlik seriya</span></div>
+                  </div>
                 </div>
-                <div className="tutor-card">
-                  <div className="tutor-card-label"><span className="online-dot" /> YOUR AI STUDY BUDDY</div>
-                  <AnimeTutor character={character} onChange={setCharacter} />
-                  <div className="tutor-card-bottom"><span><Sparkles size={14} /> {character === "reya" ? "Reya" : character === "mika" ? "Mika" : "Yuki"} bilan mashq qil</span><button onClick={() => changeSection("speaking")}>Gaplashish <ArrowRight size={14} /></button></div>
+                <div className="panel today-plan-card">
+                  <div className="panel-heading">
+                    <div><span className="eyebrow">DAILY STUDY PLAN</span><h3>Bugungi reja</h3></div>
+                    <span className="plan-date">TODAY</span>
+                  </div>
+                  <button className="today-plan-row" onClick={() => changeSection("listening")}>
+                    <span className="plan-icon listening"><Headphones size={18} /></span>
+                    <span><b>Listening practice</b><small>Audio va tushunish mashqi</small></span>
+                    <em>15 min</em><ChevronRight size={16} />
+                  </button>
+                  <button className="today-plan-row" onClick={() => changeSection("vocabulary")}>
+                    <span className="plan-icon vocabulary"><BookText size={18} /></span>
+                    <span><b>Vocabulary review</b><small>Yangi so‘zlarni takrorlash</small></span>
+                    <em>10 min</em><ChevronRight size={16} />
+                  </button>
+                  <button className="today-plan-row" onClick={() => { setIeltsTab("writing"); changeSection("ielts"); }}>
+                    <span className="plan-icon writing"><BookOpen size={18} /></span>
+                    <span><b>Writing task</b><small>Qisqa essay mashqi</small></span>
+                    <em>20 min</em><ChevronRight size={16} />
+                  </button>
+                  <button className="plan-start-button" onClick={() => changeSection("ielts")}>Barcha mashqlar <ArrowRight size={15} /></button>
                 </div>
+              </div>
+
+              <div className="section-heading"><div><span className="eyebrow">IELTS SKILLS</span><h2>Qaysi ko‘nikmani mashq qilamiz?</h2></div><button className="text-link" onClick={() => changeSection("ielts")}>Mock testlar <ArrowRight size={15} /></button></div>
+              <div className="skill-grid">
+                <button className="skill-card" onClick={() => changeSection("listening")}><span className="skill-card-icon listening"><Headphones size={21} /></span><span className="skill-card-copy"><b>Listening</b><small>Audio tinglash va savollar</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
+                <button className="skill-card" onClick={() => { setIeltsTab("reading"); changeSection("ielts"); }}><span className="skill-card-icon reading"><BookOpen size={21} /></span><span className="skill-card-copy"><b>Reading</b><small>Matn va savollar ustida ishlash</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
+                <button className="skill-card" onClick={() => { setIeltsTab("writing"); changeSection("ielts"); }}><span className="skill-card-icon writing"><BookText size={21} /></span><span className="skill-card-copy"><b>Writing</b><small>Task 1 va Task 2 yozish</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
+                <button className="skill-card" onClick={() => { setIeltsTab("speaking"); changeSection("ielts"); }}><span className="skill-card-icon speaking"><Mic size={21} /></span><span className="skill-card-copy"><b>Speaking</b><small>Javob berish va gapirish</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
               </div>
 
               <div className="section-heading"><div><span className="eyebrow">LEARNING PATH</span><h2>Qayerdan boshlaymiz?</h2></div><button className="text-link" onClick={() => changeSection("lessons")}>Barcha darslar <ArrowRight size={15} /></button></div>
@@ -410,7 +360,7 @@ export default function App() {
           {section === "speaking" && (
             <div className="section-view">
               <div className="page-intro"><span className="eyebrow">SPEAK WITH CONFIDENCE</span><h1>Ovozingni <span>mashq qil.</span></h1><p>Berilgan mavzuda inglizcha gapir. Brauzer ovozingni matnga aylantiradi.</p></div>
-              <div className="speaking-layout"><div className="panel speaking-card"><div className="speaking-character"><AnimeTutor character={character} compact /></div><span className="eyebrow">TODAY'S SPEAKING TOPIC</span><h2>{speakingPrompts[progress.completed.length % speakingPrompts.length]}</h2><p>1 daqiqa davomida gapirishga harakat qil. Xatolardan qo‘rqma — mashq qilish muhim.</p><div className="record-controls"><button className={isRecording ? "record-button recording" : "record-button"} onClick={isRecording ? stopRecognition : startRecognition}>{isRecording ? <MicOff size={19} /> : <Mic size={19} />}{isRecording ? "To‘xtatish" : "Gapirishni boshlash"}</button><span>{isRecording ? "Ovoz tinglanmoqda..." : "Mikrofon ruxsati so‘ralishi mumkin"}</span></div></div><div className="panel transcript-panel"><span className="eyebrow">YOUR SPEECH</span><h3>Tanilgan matn</h3><div className="transcript-output">{spokenText || "Mikrofon tugmasini bosib inglizcha gapiring. Tanilgan so‘zlar shu yerda ko‘rinadi."}</div><div className="transcript-actions"><button className="soft-button" onClick={() => setSpokenText("")}><RotateCcw size={15} /> Tozalash</button><button className="primary-button" disabled={!spokenText.trim() || spokenText.startsWith("Mikrofon") || spokenText.startsWith("Bu brauzer")} onClick={() => { complete("speaking-" + progress.completed.length, 15); setSpokenText(spokenText + "\n\nODIY: Mashq uchun rahmat! Keyingi safar gaplaringni yanada ravon qilishga harakat qil."); }}>Mashqni saqlash <Check size={15} /></button></div><div className="lesson-tip"><Lightbulb size={16} /> Bu brauzer nutqni matnga aylantiradi. IELTS Speaking uchun rasmiy Band Score bermaydi.</div></div></div>
+              <div className="speaking-layout"><div className="panel speaking-card"><div className="speaking-prompt-banner"><span className="plan-icon speaking"><Mic size={22} /></span><span><b>IELTS SPEAKING</b><small>PART 2 • 1 minute to prepare</small></span></div><span className="eyebrow">TODAY'S SPEAKING TOPIC</span><h2>{speakingPrompts[progress.completed.length % speakingPrompts.length]}</h2><p>1 daqiqa davomida gapirishga harakat qil. Xatolardan qo‘rqma — mashq qilish muhim.</p><div className="record-controls"><button className={isRecording ? "record-button recording" : "record-button"} onClick={isRecording ? stopRecognition : startRecognition}>{isRecording ? <MicOff size={19} /> : <Mic size={19} />}{isRecording ? "To‘xtatish" : "Gapirishni boshlash"}</button><span>{isRecording ? "Ovoz tinglanmoqda..." : "Mikrofon ruxsati so‘ralishi mumkin"}</span></div></div><div className="panel transcript-panel"><span className="eyebrow">YOUR SPEECH</span><h3>Tanilgan matn</h3><div className="transcript-output">{spokenText || "Mikrofon tugmasini bosib inglizcha gapiring. Tanilgan so‘zlar shu yerda ko‘rinadi."}</div><div className="transcript-actions"><button className="soft-button" onClick={() => setSpokenText("")}><RotateCcw size={15} /> Tozalash</button><button className="primary-button" disabled={!spokenText.trim() || spokenText.startsWith("Mikrofon") || spokenText.startsWith("Bu brauzer")} onClick={() => { complete("speaking-" + progress.completed.length, 15); setSpokenText(spokenText + "\n\nODIY: Mashq uchun rahmat! Keyingi safar gaplaringni yanada ravon qilishga harakat qil."); }}>Mashqni saqlash <Check size={15} /></button></div><div className="lesson-tip"><Lightbulb size={16} /> Bu brauzer nutqni matnga aylantiradi. IELTS Speaking uchun rasmiy Band Score bermaydi.</div></div></div>
             </div>
           )}
 
