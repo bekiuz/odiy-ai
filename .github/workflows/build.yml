@@ -1,5 +1,7 @@
 name: Deploy ODIY English to GitHub Pages
 
+# GitHub Pages must be enabled in repository Settings > Pages with Source: GitHub Actions.
+
 on:
   push:
     branches: [main]
