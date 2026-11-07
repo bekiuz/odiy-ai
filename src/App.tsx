@@ -119,7 +119,7 @@ function AnimeTutor({ character, compact = false, onChange }: { character: Chara
       {character === "reya" ? (
         <video
           className="anime-video"
-          src={import.meta.env.BASE_URL + "mascot-loop.webm"}
+          src={(window.location.pathname.startsWith("/odiy-ai") ? "/odiy-ai/" : "/") + "mascot-loop.webm"}
           autoPlay
           loop
           muted
