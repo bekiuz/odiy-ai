@@ -7,6 +7,8 @@ const ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:5173",
 ]);
 
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
+
 function cors(origin) {
   const allowedOrigin =
     origin && ALLOWED_ORIGINS.has(origin)
@@ -33,20 +35,21 @@ function json(data, status, origin) {
   });
 }
 
-async function requestGemini(model, input, apiKey) {
-  return fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      system_instruction: SYSTEM_PROMPT,
-      input,
-      store: false,
-    }),
-  });
+function getReply(result) {
+  if (typeof result?.response === "string") return result.response.trim();
+  if (typeof result?.output === "string") return result.output.trim();
+
+  const content = result?.choices?.[0]?.message?.content;
+  if (typeof content === "string") return content.trim();
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (typeof part?.text === "string" ? part.text : ""))
+      .join("")
+      .trim();
+  }
+
+  return "";
 }
 
 export default {
@@ -64,9 +67,12 @@ export default {
       return json({ error: "Faqat POST so‘rovi qabul qilinadi." }, 405, origin);
     }
 
-    if (!env.GEMINI_API_KEY) {
+    if (!env.AI) {
       return json(
-        { error: "Gemini API kaliti Worker’da sozlanmagan." },
+        {
+          error:
+            "Cloudflare Workers AI binding topilmadi. Settings → Bindings ichida AI nomli binding qo‘shing.",
+        },
         503,
         origin
       );
@@ -109,76 +115,42 @@ export default {
       );
     }
 
-    const transcript = messages
-      .slice(-12)
-      .map((item) =>
-        item.role === "assistant"
-          ? "ODIY AI: " + item.content
-          : "Student: " + item.content
-      )
-      .join("\n\n");
-
-    const input =
-      "Continue this tutoring conversation. Answer the latest student message.\n\n" +
-      transcript;
+    const chatMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages.slice(-12).map((item) => ({
+        role: item.role,
+        content: item.content,
+      })),
+    ];
 
     try {
-      // Try the preferred model first.
-      let selectedModel = "gemini-3.8-flash";
-      let upstream = await requestGemini(
-        selectedModel,
-        input,
-        env.GEMINI_API_KEY
-      );
+      const result = await env.AI.run(MODEL, {
+        messages: chatMessages,
+        max_tokens: 900,
+        temperature: 0.3,
+        chat_template_kwargs: {
+          enable_thinking: false,
+        },
+      });
 
-      // If Google is temporarily overloaded, pause briefly and try the
-      // supported Gemini 3.7 Flash model automatically.
-      if (upstream.status === 503) {
-        await new Promise((resolve) => setTimeout(resolve, 900));
-        selectedModel = "gemini-3.7-flash";
-        upstream = await requestGemini(
-          selectedModel,
-          input,
-          env.GEMINI_API_KEY
+      const reply = getReply(result);
+
+      if (!reply) {
+        return json(
+          { error: "Gemma 4 javobi bo‘sh qaytdi." },
+          502,
+          origin
         );
       }
 
-      const result = await upstream.json();
-
-      if (!upstream.ok) {
-        let message =
-          result.error?.message ||
-          "Gemini API so‘rovni qabul qilmadi (HTTP " +
-            upstream.status +
-            ").";
-
-        if (upstream.status === 503) {
-          message =
-            "Gemini serverlarida vaqtinchalik yuqori yuklama. Birozdan keyin qayta urinib ko‘ring.";
-        } else if (upstream.status === 429) {
-          message =
-            "Gemini API limiti vaqtincha tugadi. Keyinroq qayta urinib ko‘ring.";
-        }
-
-        return json({ error: message }, upstream.status, origin);
-      }
-
-      const reply = (result.steps || [])
-        .filter((step) => step.type === "model_output")
-        .flatMap((step) => step.content || [])
-        .filter((part) => part.type === "text")
-        .map((part) => part.text || "")
-        .join("")
-        .trim();
-
-      if (!reply) {
-        return json({ error: "Gemini javobi bo‘sh qaytdi." }, 502, origin);
-      }
-
-      return json({ reply, mode: selectedModel }, 200, origin);
-    } catch {
+      return json({ reply, mode: MODEL }, 200, origin);
+    } catch (error) {
       return json(
-        { error: "Gemini serveriga ulanib bo‘lmadi." },
+        {
+          error:
+            "Cloudflare AI xatosi: " +
+            (error instanceof Error ? error.message : "Noma’lum xato."),
+        },
         502,
         origin
       );
