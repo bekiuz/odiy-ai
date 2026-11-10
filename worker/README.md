@@ -1,28 +1,23 @@
 # ODIY AI Tutor Worker
 
-This Worker connects the GitHub Pages frontend to the Gemini Interactions API. The Gemini key stays in a Cloudflare secret and is never exposed to the browser.
+This Worker uses Cloudflare Workers AI directly. It does not need a Gemini API key or an external AI provider key.
 
-## Runtime
+## Model
 
-- Model: `gemini-3.8-flash`
-- API: `https://generativelanguage.googleapis.com/v1beta/interactions`
-- Conversation history is sent statelessly with `store: false`.
+- Model: `@cf/google/gemma-4-26b-a4b-it`
+- Runtime: Cloudflare Workers AI binding, named `AI`
+- Free plan allocation: 10,000 Neurons per day. Usage above that requires a Paid plan; on Workers Free, requests stop when the free allowance is exhausted.
 
-## Deploy
+## Cloudflare Dashboard setup
 
-1. Install Wrangler: `npm install -g wrangler`
-2. From this folder, sign in: `wrangler login`
-3. Add your Google AI Studio key as a secret: `wrangler secret put GEMINI_API_KEY`
-4. Deploy: `wrangler deploy`
-5. Copy the deployed Worker URL (for example, `https://odiy-ai-tutor.<your-subdomain>.workers.dev`).
+1. Open **Workers & Pages → odiy-ai-tutor → Settings → Bindings**.
+2. Select **Add binding → Workers AI**.
+3. Set the variable name to exactly `AI`.
+4. Save the binding.
+5. Open **Edit code**, replace the code with `worker.js`, and deploy.
 
-## Connect GitHub Pages
+No Gemini secret is used by this version. The old `GEMINI_API_KEY` secret can be removed after confirming the tutor works.
 
-In the GitHub repository, open **Settings → Secrets and variables → Actions → Variables** and add:
+## GitHub Pages
 
-- Name: `VITE_AI_API_URL`
-- Value: your deployed Worker URL
-
-Then rerun the **Build and deploy to GitHub Pages** workflow. Do not add the Gemini key to GitHub Pages variables or frontend code; it belongs only in the Cloudflare Worker secret.
-
-The Worker accepts POST requests containing a `messages` array and returns `{ "reply": "..." }`.
+The frontend continues to call the same Worker URL. No frontend rebuild is needed when only the Worker model changes.
