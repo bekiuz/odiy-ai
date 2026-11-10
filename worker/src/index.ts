@@ -42,6 +42,26 @@ function json(data: unknown, status: number, origin: string | null): Response {
   });
 }
 
+async function requestGemini(
+  model: string,
+  input: string,
+  apiKey: string,
+): Promise<Response> {
+  return fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      model,
+      system_instruction: SYSTEM_PROMPT,
+      input,
+      store: false,
+    }),
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin");
@@ -108,25 +128,27 @@ export default {
       )
       .join("\n\n");
 
+    const input =
+      "Continue this tutoring conversation. Answer the latest student message.\n\n" +
+      transcript;
+
     try {
-      const upstream = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/interactions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            model: "gemini-3.8-flash",
-            system_instruction: SYSTEM_PROMPT,
-            input:
-              "Continue this tutoring conversation. Answer the latest student message.\n\n" +
-              transcript,
-            store: false,
-          }),
-        },
+      let selectedModel = "gemini-3.8-flash";
+      let upstream = await requestGemini(
+        selectedModel,
+        input,
+        env.GEMINI_API_KEY,
       );
+
+      if (upstream.status === 503) {
+        await new Promise((resolve) => setTimeout(resolve, 900));
+        selectedModel = "gemini-3.7-flash";
+        upstream = await requestGemini(
+          selectedModel,
+          input,
+          env.GEMINI_API_KEY,
+        );
+      }
 
       const result = (await upstream.json()) as {
         steps?: Array<{
@@ -137,17 +159,21 @@ export default {
       };
 
       if (!upstream.ok) {
-        return json(
-          {
-            error:
-              result.error?.message ||
-              "Gemini API so‘rovni qabul qilmadi (HTTP " +
-                upstream.status +
-                ").",
-          },
-          upstream.status,
-          origin,
-        );
+        let message =
+          result.error?.message ||
+          "Gemini API so‘rovni qabul qilmadi (HTTP " +
+            upstream.status +
+            ").";
+
+        if (upstream.status === 503) {
+          message =
+            "Gemini serverlarida vaqtinchalik yuqori yuklama. Birozdan keyin qayta urinib ko‘ring.";
+        } else if (upstream.status === 429) {
+          message =
+            "Gemini API limiti vaqtincha tugadi. Keyinroq qayta urinib ko‘ring.";
+        }
+
+        return json({ error: message }, upstream.status, origin);
       }
 
       const reply = result.steps
@@ -162,7 +188,7 @@ export default {
         return json({ error: "Gemini javobi bo‘sh qaytdi." }, 502, origin);
       }
 
-      return json({ reply, mode: "gemini-3.8-flash" }, 200, origin);
+      return json({ reply, mode: selectedModel }, 200, origin);
     } catch {
       return json(
         { error: "Gemini serveriga ulanib bo‘lmadi." },
