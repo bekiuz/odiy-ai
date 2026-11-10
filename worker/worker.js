@@ -85,26 +85,23 @@ export default {
         item.content.length <= 4000
     );
 
-    if (!valid) {
+    if (!valid || !messages.some((item) => item.role === "user")) {
       return json(
-        { error: "Xabar formati noto‘g‘ri yoki juda uzun." },
+        { error: "Xabar formati noto‘g‘ri yoki foydalanuvchi xabari yo‘q." },
         400,
         origin
       );
     }
 
-    // Stateless conversation history for the Gemini Interactions API.
-    const input = messages.slice(-12).map((item) =>
-      item.role === "assistant"
-        ? {
-            type: "model_output",
-            content: [{ type: "text", text: item.content }],
-          }
-        : {
-            type: "user_input",
-            content: [{ type: "text", text: item.content }],
-          }
-    );
+    // A plain-text transcript is a supported Interactions API input format.
+    const transcript = messages
+      .slice(-12)
+      .map((item) =>
+        item.role === "assistant"
+          ? "ODIY AI: " + item.content
+          : "Student: " + item.content
+      )
+      .join("\n\n");
 
     try {
       const upstream = await fetch(
@@ -118,7 +115,9 @@ export default {
           body: JSON.stringify({
             model: "gemini-3.8-flash",
             system_instruction: SYSTEM_PROMPT,
-            input,
+            input:
+              "Continue this tutoring conversation. Answer the latest student message.\n\n" +
+              transcript,
             store: false,
           }),
         }
@@ -129,10 +128,9 @@ export default {
       if (!upstream.ok) {
         const message =
           result.error?.message ||
-          (upstream.status === 429
-            ? "Gemini foydalanish limiti vaqtincha tugadi. Keyinroq urinib ko‘ring."
-            : "Gemini API so‘rovni qabul qilmadi.");
-
+          "Gemini API so‘rovni qabul qilmadi (HTTP " +
+            upstream.status +
+            ").";
         return json({ error: message }, upstream.status, origin);
       }
 
