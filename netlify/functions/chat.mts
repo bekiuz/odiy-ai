@@ -1,161 +1,51 @@
 import type { Context } from "@netlify/functions";
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+type ChatMessage = { role: "user" | "assistant"; content: string };
+const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
-type GroqResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
-    };
-  }>;
-  error?: {
-    message?: string;
-    type?: string;
-    code?: string;
-  };
-};
-
-const SYSTEM_PROMPT = [
-  "You are ODIY AI, a friendly, patient English tutor specialising in IELTS.",
-  "Reply in the language the learner uses unless they ask to practise English.",
-  "When the learner writes English, correct errors naturally and explain the most important mistake simply.",
-  "For IELTS Writing and Speaking, give practical feedback on clarity, grammar, vocabulary, coherence and task response when relevant.",
-  "Use examples and short exercises suited to the learner's level.",
-  "Keep replies clear and useful. Finish with one practical next step.",
-  "Never claim to provide an official IELTS score.",
-].join(" ");
-
-const json = (data: unknown, status = 200) =>
-  Response.json(data, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
-
-function extractReply(data: GroqResponse): string {
-  const content = data.choices?.[0]?.message?.content;
-
-  if (typeof content === "string") return content.trim();
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part.text === "string" ? part.text : ""))
-      .join("")
-      .trim();
+function localFeedback(messages: ChatMessage[]) {
+  const last = [...messages].reverse().find((message) => message.role === "user")?.content.trim() || "";
+  const lower = last.toLowerCase();
+  if (!last) return "Share a sentence, paragraph, or IELTS question and I’ll coach you through it.";
+  if (lower.includes("essay") || lower.includes("writing") || last.length > 120) {
+    return "Here’s a focused review framework:\n\n1. **Task response:** make your position explicit in the introduction and answer every part of the prompt.\n2. **Coherence:** begin each body paragraph with one clear topic sentence, then develop it with an explanation and example.\n3. **Lexical resource:** replace repeated general words with precise academic language, but avoid memorised phrases.\n4. **Next step:** revise one paragraph and add a specific example after your main claim.";
   }
+  if (/\b(is|are|was|were|have|has|do|does)\b/i.test(last)) {
+    return "Your meaning is clear. To make this more natural, check subject–verb agreement and article use. Try reading the sentence aloud, then add one precise detail or linking word. If you share the exact sentence, I can mark the correction directly.";
+  }
+  return "Good start. I’d make your idea more precise by adding a reason or example. For IELTS, aim for one clear claim, one explanation, and one relevant example. Want to share a longer answer for detailed feedback?";
+}
 
-  return "";
+async function modelFeedback(messages: ChatMessage[]) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const base = process.env.OPENAI_API_BASE || "https://api.openai.com/v1";
+  const response = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: "You are ODIY AI, a concise and encouraging English tutor specialising in IELTS. Give actionable feedback in English. Correct errors with a short explanation, mention IELTS criteria only when relevant, and finish with one next step. Never claim to provide an official IELTS score." },
+        ...messages.slice(-12),
+      ],
+    }),
+  });
+  if (!response.ok) return null;
+  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content || null;
 }
 
 export default async (request: Request, _context: Context) => {
-  if (request.method !== "POST") {
-    return json({ error: "Only POST requests are accepted." }, 405);
-  }
-
+  if (request.method !== "POST") return json({ error: "Only POST requests are accepted." }, 405);
   let body: { messages?: ChatMessage[] };
-  try {
-    body = (await request.json()) as { messages?: ChatMessage[] };
-  } catch {
-    return json({ error: "Request body must be valid JSON." }, 400);
-  }
-
-  if (
-    !Array.isArray(body.messages) ||
-    body.messages.length === 0 ||
-    body.messages.length > 20
-  ) {
-    return json({ error: "No valid messages were provided." }, 400);
-  }
-
-  const messages = body.messages;
-  const valid = messages.every(
-    (item) =>
-      item &&
-      (item.role === "user" || item.role === "assistant") &&
-      typeof item.content === "string" &&
-      item.content.trim().length > 0 &&
-      item.content.length <= 4000,
-  );
-
-  if (!valid || !messages.some((item) => item.role === "user")) {
-    return json(
-      { error: "Message format is invalid or too long." },
-      400,
-    );
-  }
-
-  const apiKey = Netlify.env.get("GROQ_API_KEY");
-  if (!apiKey) {
-    return json(
-      {
-        error:
-          "Groq API kaliti Netlify’da sozlanmagan. Site configuration → Environment variables ichida GROQ_API_KEY qo‘shing.",
-      },
-      503,
-    );
-  }
-
-  const model = Netlify.env.get("GROQ_MODEL") || "openai/gpt-oss-20b";
-
-  try {
-    const upstream = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages.slice(-12),
-          ],
-          temperature: 0.3,
-          max_completion_tokens: 900,
-          stream: false,
-        }),
-      },
-    );
-
-    const data = (await upstream.json()) as GroqResponse;
-
-    if (!upstream.ok) {
-      if (upstream.status === 429) {
-        return json(
-          {
-            error:
-              "Groq bepul foydalanish limiti tugadi yoki vaqtinchalik so‘rov chegarasiga yetdingiz. Limit yangilangach qayta urinib ko‘ring.",
-          },
-          429,
-        );
-      }
-
-      return json(
-        {
-          error:
-            data.error?.message ||
-            `Groq API xatosi (HTTP ${upstream.status}).`,
-        },
-        upstream.status >= 400 && upstream.status < 600
-          ? upstream.status
-          : 502,
-      );
-    }
-
-    const reply = extractReply(data);
-    if (!reply) {
-      return json({ error: "Groq javobi bo‘sh qaytdi. Qayta urinib ko‘ring." }, 502);
-    }
-
-    return json({ reply, mode: model });
-  } catch {
-    return json(
-      { error: "Groq serveriga ulanib bo‘lmadi. Internet yoki API holatini tekshiring." },
-      502,
-    );
-  }
+  try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+  if (!Array.isArray(body.messages) || body.messages.length === 0) return json({ error: "No messages were provided." }, 400);
+  const messages = body.messages.slice(-20);
+  const valid = messages.every((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim().length > 0 && item.content.length <= 4000);
+  if (!valid) return json({ error: "Message format is invalid or too long." }, 400);
+  let reply = await modelFeedback(messages).catch(() => null);
+  if (!reply) reply = localFeedback(messages);
+  return json({ reply, mode: process.env.OPENAI_API_KEY ? "model" : "local-fallback" });
 };
