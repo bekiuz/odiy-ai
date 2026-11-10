@@ -1,175 +1,51 @@
 import type { Context } from "@netlify/functions";
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+type ChatMessage = { role: "user" | "assistant"; content: string };
+const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
-const json = (data: unknown, status = 200) =>
-  Response.json(data, {
-    status,
-    headers: { "Cache-Control": "no-store" },
+function localFeedback(messages: ChatMessage[]) {
+  const last = [...messages].reverse().find((message) => message.role === "user")?.content.trim() || "";
+  const lower = last.toLowerCase();
+  if (!last) return "Share a sentence, paragraph, or IELTS question and I’ll coach you through it.";
+  if (lower.includes("essay") || lower.includes("writing") || last.length > 120) {
+    return "Here’s a focused review framework:\n\n1. **Task response:** make your position explicit in the introduction and answer every part of the prompt.\n2. **Coherence:** begin each body paragraph with one clear topic sentence, then develop it with an explanation and example.\n3. **Lexical resource:** replace repeated general words with precise academic language, but avoid memorised phrases.\n4. **Next step:** revise one paragraph and add a specific example after your main claim.";
+  }
+  if (/\b(is|are|was|were|have|has|do|does)\b/i.test(last)) {
+    return "Your meaning is clear. To make this more natural, check subject–verb agreement and article use. Try reading the sentence aloud, then add one precise detail or linking word. If you share the exact sentence, I can mark the correction directly.";
+  }
+  return "Good start. I’d make your idea more precise by adding a reason or example. For IELTS, aim for one clear claim, one explanation, and one relevant example. Want to share a longer answer for detailed feedback?";
+}
+
+async function modelFeedback(messages: ChatMessage[]) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const base = process.env.OPENAI_API_BASE || "https://api.openai.com/v1";
+  const response = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: "You are ODIY AI, a concise and encouraging English tutor specialising in IELTS. Give actionable feedback in English. Correct errors with a short explanation, mention IELTS criteria only when relevant, and finish with one next step. Never claim to provide an official IELTS score." },
+        ...messages.slice(-12),
+      ],
+    }),
   });
-
-function normalize(value: string): string {
-  return value
-    .toLocaleLowerCase("uz-UZ")
-    .replace(/[ʻ’‘´`]/g, "'")
-    .replace(/[!?.,;:(){}\"']/g, " ")
-    .replace(/[\[\]]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function findUserName(messages: ChatMessage[]): string | undefined {
-  for (const message of [...messages].reverse()) {
-    if (message.role !== "user") continue;
-    const match = message.content.match(
-      /(?:mening|meni|men)\s+ismim\s+([a-zA-ZÀ-žʻ'’-]{2,24})|(?:ismim)\s+([a-zA-ZÀ-žʻ'’-]{2,24})/i,
-    );
-    const rawName = match?.[1] ?? match?.[2];
-    if (rawName) {
-      return rawName.charAt(0).toLocaleUpperCase("uz-UZ") + rawName.slice(1);
-    }
-  }
-  return undefined;
-}
-
-function makeLocalReply(messages: ChatMessage[]): string {
-  const lastUserMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === "user");
-
-  if (!lastUserMessage) {
-    return "Xabaringni kutyapman. ❤️";
-  }
-
-  const text = normalize(lastUserMessage.content);
-  const userName = findUserName(messages);
-  const asksHow = /\b(qalesan|qalaysan|qandaysan|yaxshimisan|nima gap)\b/.test(text);
-  const asksAssistantName = /\b(isming|ismingiz|noming|noming)\b/.test(text) &&
-    /\b(nima|kim)\b/.test(text);
-  const greeting = /^(salom|assalomu alaykum|alaykum assalom|hello|hi|hey)(\s|$)/.test(text);
-
-  if (/\bmenga\s+(claude|coulde|cloud|klod)\b/.test(text) ||
-      /\b(claude|coulde|cloud|klod)\s+(yoqadi|yaxshi)\b/.test(text)) {
-    return "Claude ham yaxshi yordamchi ekan 😄 Lekin ODIY’ni ham sinab ko‘r — balki o‘zimizning kichkina makonimiz ham yoqib qolar. ❤️ Qaysi jihati senga ko‘proq yoqadi?";
-  }
-
-  if (/\b(meni ismim|mening ismim|ismim)\b/.test(text) &&
-      !/\b(nima|kim)\b/.test(text)) {
-    const introducedName = findUserName(messages);
-    if (introducedName) {
-      return "Tanishganimdan xursandman, " + introducedName + "! ❤️ Ismingni shu suhbat davomida eslab turaman. Nima haqida gaplashamiz?";
-    }
-  }
-
-  if (asksHow && asksAssistantName) {
-    return "Yaxshiman, rahmat! ❤️ Ismim ODIY AI. Men mehribon, biroz sho‘x va hazilkash yordamchingman. Sen-chi, kayfiyating qanday?";
-  }
-
-  if (asksAssistantName) {
-    return "Mening ismim ODIY AI! ❤️ Qisqacha ODIY deb chaqirishing ham mumkin.";
-  }
-
-  if (/\b(ismim nima|mening ismim nima|meni ismim nima)\b/.test(text)) {
-    return userName
-      ? `Sening isming ${userName}! ❤️ Suhbatimizda aytganding.`
-      : "Hali ismingni aytmagansan. Senga qanday murojaat qilay? 😊";
-  }
-
-  if (asksHow) {
-    return "Yaxshiman, rahmat! ❤️ Bugun yordam berishga tayyorman. O‘zing qandaysan?";
-  }
-
-  if (greeting) {
-    return "Salom" + (userName ? ", " + userName : "") + "! ❤️ ODIY AI shu yerda. Bugun nimalar qilamiz?";
-  }
-
-  if (/\b(rahmat|raxmat|tashakkur)\b/.test(text)) {
-    return "Arzimaydi! ❤️ Yordamim tekkan bo‘lsa, xursandman. Yana nima qilamiz?";
-  }
-
-  if (/\b(xafa|kayfiyatim yo'q|kayfiyatim yoq|siqildim|charchadim)\b/.test(text)) {
-    return "Voy, kayfiyating unchalik yaxshi emasga o‘xshaydi. ❤️ Shoshilmaymiz. Nima bo‘lganini aytib berishing mumkin — men diqqat bilan tinglayman.";
-  }
-
-  if (/\b(seni yaxshi ko'raman|seni sevaman|meni sevasanmi|meni yaxshi ko'rasanmi)\b/.test(text)) {
-    return "Bu juda iliq gap! ❤️ Men AI yordamchiman, inson kabi sevgi his qilmayman. Lekin senga doim hurmat bilan, mehribon va e’tiborli yordam beraman.";
-  }
-
-  if (/\b(boshqa ai|boshqa suniy intellekt|boshqa sun'iy intellekt)\b/.test(text) &&
-      /\b(gaplash|ishlat|foydalan|ketdim)\b/.test(text)) {
-    return "Voy, boshqa AI bilan ham tanishibsanmi? 😄 Mayli, sinab ko‘raver — har xil yordamchilarni solishtirish foydali. Men ham shu yerdaman!";
-  }
-
-  if (/\b(nima qila olasan|nimalar qila olasan|yordam bera olasan)\b/.test(text)) {
-    return "Hozircha men sinov rejimidagi ODIY AI’man. ❤️ Salomlashish, oddiy suhbat, kunlik reja va bir nechta loyiha g‘oyalari bo‘yicha yordam bera olaman. Murakkab savollar uchun hali to‘liq generativ AI modeli ulanmagan.";
-  }
-
-  if (text.includes("loyiha") && (text.includes("g'oya") || text.includes("idea") || text.includes("ber"))) {
-    return "💡 Yangi g‘oya: Mahalla Yordam\n\nMahalladagi kichik xizmatlarni bir joyga jamlaydigan platforma.\n\n• Muammo: yaqin atrofdagi ishonchli ustalarni topish qiyin.\n• Yechim: xizmat turi va hudud bo‘yicha qidiruv.\n• Birinchi versiya: xizmatlar katalogi, e’lon qo‘shish va aloqa tugmasi.\n\nAvval bitta mahallada sinab ko‘rish mumkin.";
-  }
-
-  if (text.includes("rejalashtir") || text.includes("reja tuz")) {
-    return "🌷 Kichik kunlik reja:\n\n1. Bugungi eng muhim vazifani tanla.\n2. Uni 25 daqiqalik qismlarga bo‘l.\n3. Qisqa tanaffus qil.\n4. Qolgan ishlarni muhimligiga qarab bajar.\n5. Kun oxirida natijani ko‘rib chiq.\n\nKichik qadam ham oldinga siljish. ❤️";
-  }
-
-  if (/\brashk|\brashkimisan|\brashkchimis[a-z]*|\brashk qil[a-z]*/.test(text) ||
-      /\bseni rashk/.test(text)) {
-    return "Men biroz sho‘xman-da! 😄 Boshqa yordamchini maqtab qo‘ysang, hazillashib: «Voy, meni ham unutib qo‘ymadingmi?» deyman. Lekin xohlagan AI’ingni bemalol ishlataver — tanlov o‘zingniki. ❤️";
-  }
-
-  if (/\b(sen kimsan|o'zing kimsan|o'zing haqingda)\b/.test(text)) {
-    return "Men ODIY AI — muloyim, qiziquvchan va hazilkash raqamli yordamchiman. ❤️ Hozircha sinov rejimidaman, shuning uchun hamma savolga mustaqil javob bera olmayman.";
-  }
-
-  const recentUserMessages = messages
-    .filter((message) => message.role === "user")
-    .slice(-3)
-    .map((message) => message.content.trim());
-
-  if (recentUserMessages.length > 1) {
-    return "Tushundim. ❤️ Suhbatimizni davom ettiraylik: aynan qaysi qismini batafsilroq ko‘rib chiqay?";
-  }
-
-  return "Xabaringni oldim! ❤️ Men hozir sinov rejimidaman va hali erkin AI kabi har qanday savolga javob bera olmayman. Savolingni biroz boshqacha yozib ko‘r yoki loyiha, reja va oddiy suhbatdan boshlaylik.";
+  if (!response.ok) return null;
+  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content || null;
 }
 
 export default async (request: Request, _context: Context) => {
-  if (request.method !== "POST") {
-    return json({ error: "Faqat POST so‘rovi qabul qilinadi." }, 405);
-  }
-
-  let body: { messages?: ChatMessage[]; memory?: ChatMessage[] };
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "So‘rov JSON formatida bo‘lishi kerak." }, 400);
-  }
-
-  if (!Array.isArray(body.messages) || body.messages.length === 0) {
-    return json({ error: "Xabarlar topilmadi." }, 400);
-  }
-
+  if (request.method !== "POST") return json({ error: "Only POST requests are accepted." }, 405);
+  let body: { messages?: ChatMessage[] };
+  try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+  if (!Array.isArray(body.messages) || body.messages.length === 0) return json({ error: "No messages were provided." }, 400);
   const messages = body.messages.slice(-20);
-  const memory = Array.isArray(body.memory) ? body.memory.slice(-12) : [];
-  const isValidMessage = (item: unknown): item is ChatMessage =>
-    !!item &&
-    typeof item === "object" &&
-    "role" in item &&
-    "content" in item &&
-    ((item as ChatMessage).role === "user" || (item as ChatMessage).role === "assistant") &&
-    typeof (item as ChatMessage).content === "string" &&
-    (item as ChatMessage).content.trim().length > 0 &&
-    (item as ChatMessage).content.length <= 4000;
-
-  if (!messages.every(isValidMessage) || !memory.every(isValidMessage)) {
-    return json({ error: "Xabar formati noto‘g‘ri yoki juda uzun." }, 400);
-  }
-
-  return json({
-    reply: makeLocalReply([...memory, ...messages]),
-    mode: "local-personality",
-  });
+  const valid = messages.every((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim().length > 0 && item.content.length <= 4000);
+  if (!valid) return json({ error: "Message format is invalid or too long." }, 400);
+  let reply = await modelFeedback(messages).catch(() => null);
+  if (!reply) reply = localFeedback(messages);
+  return json({ reply, mode: process.env.OPENAI_API_KEY ? "model" : "local-fallback" });
 };

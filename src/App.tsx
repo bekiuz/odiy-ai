@@ -1,406 +1,97 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import {
-  ArrowRight, AudioLines, BookOpen, BookText, Brain,
-  Check, CheckCircle2, ChevronDown, ChevronRight, Clock3,
-  Flame, GraduationCap, Headphones, Heart, Home, Lightbulb,
-  Menu, Mic, MicOff, Play, RotateCcw, Search, Sparkles, Star,
-  Trophy, Volume2, X
+  ArrowRight, BarChart3, BookOpen, BookText, Brain, Check, CheckCircle2, ChevronRight,
+  Clock3, Flame, Headphones, Home, Lightbulb, Menu, Mic, MicOff, PenLine, Play,
+  RotateCcw, Send, Sparkles, Target, Trophy, Volume2, X, Zap
 } from "lucide-react";
 
-type Section = "home" | "lessons" | "vocabulary" | "grammar" | "listening" | "speaking" | "tests" | "ielts" | "progress";
-type Progress = { name: string; completed: string[]; xp: number; streak: number; words: number; level: string };
-
-type RecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
+type Section = "home" | "practice" | "tutor" | "vocabulary" | "grammar" | "progress";
+type Skill = "reading" | "listening" | "writing" | "speaking";
+type Progress = { name: string; completed: string[]; xp: number; streak: number; words: number; band: number; skillScores: Record<Skill, number> };
+type RecognitionLike = { lang: string; interimResults: boolean; onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null; onerror: ((event: { error?: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type RecognitionConstructor = new () => RecognitionLike;
 
-const STORAGE_KEY = "odiy-english-progress-v1";
-const initialProgress: Progress = { name: "O‘quvchi", completed: [], xp: 245, streak: 7, words: 36, level: "A2 — Elementary" };
-
-const modules: Array<{ id: Section; title: string; subtitle: string; icon: typeof BookOpen; color: string; count: string }> = [
-  { id: "vocabulary", title: "Lug‘at", subtitle: "Yangi so‘zlar va iboralar", icon: BookText, color: "pink", count: "6 ta so‘z" },
-  { id: "grammar", title: "Grammatika", subtitle: "Qoidalar va mashqlar", icon: Brain, color: "mint", count: "1 ta mavzu" },
-  { id: "speaking", title: "Speaking", subtitle: "Gapirish va talaffuz", icon: Mic, color: "blue", count: "4 mashq" },
-  { id: "listening", title: "Listening", subtitle: "Tinglab tushunish", icon: Headphones, color: "orange", count: "1 audio" },
-  { id: "tests", title: "Testlar", subtitle: "Bilimingizni tekshiring", icon: CheckCircle2, color: "violet", count: "5 savol" },
-  { id: "ielts", title: "IELTS", subtitle: "Imtihonga tayyorgarlik", icon: GraduationCap, color: "gold", count: "4 skill" },
-];
-
-const lessonCards = [
-  { id: "greetings", level: "A1", title: "Greetings & Introductions", subtitle: "Salomlashish va tanishish", duration: "12 daqiqa", tag: "Boshlang‘ich", icon: "👋" },
-  { id: "present", level: "A2", title: "Present Simple", subtitle: "Kundalik odatlar haqida gapirish", duration: "18 daqiqa", tag: "Grammatika", icon: "🧩" },
-  { id: "travel", level: "A2", title: "Travel & Directions", subtitle: "Sayohat va yo‘l so‘rash", duration: "15 daqiqa", tag: "Lug‘at", icon: "🧭" },
-  { id: "past", level: "B1", title: "Past Simple", subtitle: "O‘tgan voqealarni aytib berish", duration: "20 daqiqa", tag: "Grammatika", icon: "⏳" },
-];
-
-const vocabulary = [
-  { word: "Curious", phonetic: "/ˈkjʊəriəs/", translation: "Qiziquvchan", example: "I'm curious about new cultures.", note: "B2 • Adjective" },
-  { word: "Improve", phonetic: "/ɪmˈpruːv/", translation: "Yaxshilamoq", example: "I want to improve my English.", note: "A2 • Verb" },
-  { word: "Opportunity", phonetic: "/ˌɒpəˈtjuːnəti/", translation: "Imkoniyat", example: "This course is a great opportunity.", note: "B1 • Noun" },
-  { word: "Confident", phonetic: "/ˈkɒnfɪdənt/", translation: "O‘ziga ishongan", example: "She feels confident when speaking.", note: "B1 • Adjective" },
-  { word: "Achieve", phonetic: "/əˈtʃiːv/", translation: "Erishmoq", example: "You can achieve your goals step by step.", note: "B1 • Verb" },
-  { word: "Consistent", phonetic: "/kənˈsɪstənt/", translation: "Muntazam, izchil", example: "Consistent practice makes a difference.", note: "B2 • Adjective" },
-];
-
-const grammarQuestions = [
-  { question: "She ___ to school every day.", options: ["go", "goes", "going"], correct: 1, explain: "He / She / It bilan Present Simple’da fe’lga -s yoki -es qo‘shiladi." },
-  { question: "They ___ football on Sundays.", options: ["plays", "playing", "play"], correct: 2, explain: "They bilan fe’lning oddiy shakli ishlatiladi: play." },
-  { question: "___ he work here?", options: ["Do", "Does", "Is"], correct: 1, explain: "He / She / It uchun savolda Does ishlatiladi, asosiy fe’l oddiy shaklda qoladi." },
-  { question: "My brother doesn't ___ coffee.", options: ["likes", "like", "liking"], correct: 1, explain: "Doesn't dan keyin fe’lning boshlang‘ich shakli keladi: like." },
-];
-
-const testQuestions = [
-  { question: "Choose the correct sentence.", options: ["He go to work.", "He goes to work.", "He going to work."], correct: 1, explain: "He bilan Present Simple’da goes ishlatiladi." },
-  { question: "What is the opposite of “expensive”?", options: ["Cheap", "Rich", "Large"], correct: 0, explain: "Expensive — qimmat, cheap — arzon." },
-  { question: "I have lived here ___ 2020.", options: ["for", "since", "during"], correct: 1, explain: "Since aniq boshlanish vaqtini bildiradi." },
-  { question: "Choose the correct past form of “buy”.", options: ["Buyed", "Bought", "Buying"], correct: 1, explain: "Buy fe’lining Past Simple shakli bought." },
-  { question: "“Although” means…", options: ["Shuning uchun", "Garchi", "Chunki"], correct: 1, explain: "Although — garchi, ... bo‘lsa-da." },
-];
-
-const readingText = "Many people believe that learning a language requires several hours every day. However, research and experience suggest that short, regular practice can be more effective. When learners review a few words, read a short story, and speak for five minutes each day, they build a strong habit. The key is consistency, not perfection. Making mistakes is a natural part of learning, and every mistake gives you a chance to improve.";
+const STORAGE_KEY = "odiy-english-progress-v2";
+const initialProgress: Progress = { name: "Alex", completed: [], xp: 420, streak: 8, words: 86, band: 6.5, skillScores: { reading: 6.5, listening: 6.0, writing: 6.0, speaking: 6.5 } };
+const readingText = "Urban green spaces are no longer viewed as decorative additions to a city. Recent studies show that access to parks can reduce stress, encourage physical activity and strengthen social ties. However, the benefits are not distributed equally: neighbourhoods with lower incomes often have fewer well-maintained public spaces. City planners are therefore exploring smaller, connected green corridors that can bring nature closer to more residents.";
 const readingQuestions = [
-  { question: "What is the main idea of the text?", options: ["Study only once a week", "Regular short practice is useful", "Never make mistakes"], correct: 1 },
-  { question: "According to the text, mistakes are…", options: ["A natural part of learning", "A reason to stop", "Always bad"], correct: 0 },
-  { question: "What matters most?", options: ["Perfection", "Consistency", "Expensive books"], correct: 1 },
+  { q: "What is the main idea of the passage?", options: ["Parks are expensive to maintain", "Green spaces can improve urban life but access is unequal", "Cities should remove public spaces"], answer: 1 },
+  { q: "What can green spaces reduce?", options: ["Traffic", "Stress", "Income inequality"], answer: 1 },
+  { q: "What are planners exploring?", options: ["Connected green corridors", "Larger shopping centres", "Private gardens"], answer: 0 },
+];
+const listeningScript = "Good morning. The library workshop will take place on Thursday at six thirty in Room 204. Please bring your student card and a notebook. The session is free, but places are limited, so arrive ten minutes early.";
+const vocabulary = [
+  ["Sustainable", "/səˈsteɪnəbl/", "able to continue without damaging the environment", "Sustainable transport can make cities healthier."],
+  ["Allocate", "/ˈæləkeɪt/", "to give something officially for a particular purpose", "The council allocated more money to public parks."],
+  ["Significant", "/sɪɡˈnɪfɪkənt/", "important or large enough to be noticed", "There has been a significant improvement."],
+  ["Coherent", "/kəʊˈhɪərənt/", "clear, logical and easy to understand", "Your essay is coherent and well organised."],
+];
+const grammarQuestions = [
+  ["If I ___ more time, I would volunteer.", ["have", "had", "will have"], 1],
+  ["The report ___ by the research team last week.", ["completed", "was completed", "has completing"], 1],
+  ["It is essential that every student ___ prepared.", ["is", "be", "was"], 1],
 ];
 
-const listeningScript = "Hi! My name is Alex. I usually wake up at seven o'clock. I have breakfast, then I walk to the bus stop. I work in a small bookshop near the city centre. In the evening, I like reading and learning new words.";
-const speakingPrompts = [
-  "Introduce yourself and talk about your daily routine.",
-  "Describe a place you would like to visit.",
-  "Talk about a skill you want to learn and explain why.",
-  "Describe a memorable day in your life.",
-];
-
-function loadProgress(): Progress {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return initialProgress;
-    const value = JSON.parse(raw) as Partial<Progress>;
-    return {
-      ...initialProgress,
-      ...value,
-      completed: Array.isArray(value.completed) ? value.completed : [],
-    };
-  } catch {
-    return initialProgress;
-  }
-}
-
-function speakEnglish(text: string) {
-  if (!("speechSynthesis" in window)) return false;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = 0.88;
-  window.speechSynthesis.speak(utterance);
-  return true;
-}
-
-function ProgressBar({ value, color = "purple" }: { value: number; color?: string }) {
-  return <div className="progress-track"><span className={"progress-fill " + color} style={{ width: Math.max(0, Math.min(100, value)) + "%" }} /></div>;
-}
+function loadProgress(): Progress { try { const stored = localStorage.getItem(STORAGE_KEY); return stored ? { ...initialProgress, ...JSON.parse(stored) } : initialProgress; } catch { return initialProgress; } }
+function speak(text: string) { if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "en-US"; utterance.rate = 0.88; window.speechSynthesis.speak(utterance); } }
+function ProgressBar({ value, tone = "purple" }: { value: number; tone?: string }) { return <div className="progress-track"><span className={`progress-fill ${tone}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>; }
+function IconBox({ children, tone = "purple" }: { children: ReactNode; tone?: string }) { return <span className={`icon-box ${tone}`}>{children}</span>; }
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
+  const [skill, setSkill] = useState<Skill>("reading");
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [wordIndex, setWordIndex] = useState(0);
-  const [showTranslation, setShowTranslation] = useState(false);
-  const [grammarIndex, setGrammarIndex] = useState(0);
-  const [grammarAnswer, setGrammarAnswer] = useState<number | null>(null);
-  const [testIndex, setTestIndex] = useState(0);
-  const [testAnswers, setTestAnswers] = useState<number[]>([]);
-  const [testFinished, setTestFinished] = useState(false);
-  const [readingAnswers, setReadingAnswers] = useState<number[]>([]);
+  const [answers, setAnswers] = useState<number[]>([]);
   const [listeningAnswer, setListeningAnswer] = useState<number | null>(null);
-  const [spokenText, setSpokenText] = useState("");
+  const [writingText, setWritingText] = useState("");
+  const [speakingText, setSpeakingText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<RecognitionLike | null>(null);
-  const [activeLesson, setActiveLesson] = useState("present");
-  const [lessonDone, setLessonDone] = useState(false);
-  const [ieltsTab, setIeltsTab] = useState<"reading" | "listening" | "writing" | "speaking">("reading");
-  const [writingText, setWritingText] = useState("");
-  const [searchText, setSearchText] = useState("");
+  const [vocabIndex, setVocabIndex] = useState(0);
+  const [vocabFlipped, setVocabFlipped] = useState(false);
+  const [grammarIndex, setGrammarIndex] = useState(0);
+  const [grammarAnswer, setGrammarAnswer] = useState<number | null>(null);
+  const [examRunning, setExamRunning] = useState(false);
+  const [seconds, setSeconds] = useState(1800);
+  const [tutorInput, setTutorInput] = useState("");
+  const [tutorMessages, setTutorMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([{ role: "assistant", content: "Hi, I’m your ODIY AI tutor. Share an English sentence, essay paragraph, or IELTS question and I’ll give you practical feedback." }]);
+  const [tutorLoading, setTutorLoading] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-  }, [progress]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }, [progress]);
+  useEffect(() => { if (!examRunning) return; const timer = window.setInterval(() => setSeconds((value) => value <= 1 ? (setExamRunning(false), 0) : value - 1), 1000); return () => window.clearInterval(timer); }, [examRunning]);
 
-  const complete = (id: string, xp = 20) => {
-    setProgress((old) => ({
-      ...old,
-      completed: old.completed.includes(id) ? old.completed : [...old.completed, id],
-      xp: old.completed.includes(id) ? old.xp : old.xp + xp,
-    }));
-  };
+  const navigate = (next: Section) => { setSection(next); setSidebarOpen(false); };
+  const complete = (id: string, xp = 20) => setProgress((old) => old.completed.includes(id) ? old : { ...old, completed: [...old.completed, id], xp: old.xp + xp });
+  const updateSkill = (name: Skill, score: number) => setProgress((old) => { const skillScores = { ...old.skillScores, [name]: Math.max(old.skillScores[name], score) }; return { ...old, skillScores, band: Number(((Object.values(skillScores) as number[]).reduce((a, b) => a + b, 0) / 4).toFixed(1)) }; });
+  const correctReading = answers.filter((answer, index) => answer === readingQuestions[index]?.answer).length;
+  const wordCount = writingText.trim() ? writingText.trim().split(/\s+/).length : 0;
+  const tutorSend = async () => { if (!tutorInput.trim() || tutorLoading) return; const message = tutorInput.trim(); setTutorInput(""); setTutorMessages((old) => [...old, { role: "user", content: message }]); setTutorLoading(true); try { const response = await fetch("/.netlify/functions/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [...tutorMessages, { role: "user", content: message }] }) }); const data = await response.json(); setTutorMessages((old) => [...old, { role: "assistant", content: data.reply || "I couldn’t review that just yet. Try again with one sentence or paragraph." }]); } catch { setTutorMessages((old) => [...old, { role: "assistant", content: "I’m offline right now. Try checking your sentence for subject–verb agreement, articles, and clear linking words." }]); } finally { setTutorLoading(false); } };
+  const startRecognition = () => { const target = window as Window & { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor }; const Recognition = target.SpeechRecognition || target.webkitSpeechRecognition; if (!Recognition) { setSpeakingText("Speech recognition is not available in this browser. Try Chrome or type your answer instead."); return; } const instance = new Recognition(); instance.lang = "en-US"; instance.interimResults = true; instance.onresult = (event) => setSpeakingText(Array.from(event.results).map((item) => item[0].transcript).join(" ")); instance.onerror = () => { setSpeakingText("Microphone access failed. You can type your answer below."); setIsRecording(false); }; instance.onend = () => setIsRecording(false); setRecognition(instance); instance.start(); setIsRecording(true); setSpeakingText("Listening… speak in English."); };
+  const stopRecognition = () => { recognition?.stop(); setIsRecording(false); };
+  const nav = [{ id: "home" as Section, label: "Overview", icon: Home }, { id: "practice" as Section, label: "IELTS practice", icon: Target }, { id: "tutor" as Section, label: "AI tutor", icon: Sparkles }, { id: "vocabulary" as Section, label: "Vocabulary", icon: BookText }, { id: "grammar" as Section, label: "Grammar", icon: Brain }, { id: "progress" as Section, label: "Progress", icon: BarChart3 }];
+  const pageTitle = { home: "Overview", practice: "IELTS practice", tutor: "AI tutor", vocabulary: "Vocabulary", grammar: "Grammar", progress: "Progress" }[section];
+  const skillMeta: Record<Skill, { label: string; icon: typeof BookOpen; tone: string; score: number }> = { reading: { label: "Reading", icon: BookOpen, tone: "purple", score: progress.skillScores.reading }, listening: { label: "Listening", icon: Headphones, tone: "blue", score: progress.skillScores.listening }, writing: { label: "Writing", icon: PenLine, tone: "orange", score: progress.skillScores.writing }, speaking: { label: "Speaking", icon: Mic, tone: "green", score: progress.skillScores.speaking } };
 
-  const changeSection = (value: Section) => {
-    setSection(value);
-    setSidebarOpen(false);
-    setSearchText("");
-    setLessonDone(false);
-    if (value === "tests") {
-      setTestIndex(0);
-      setTestAnswers([]);
-      setTestFinished(false);
-    }
-  };
+  return <div className="app-shell">
+    <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}><div className="brand"><div className="brand-mark"><Sparkles size={18} /></div><div><strong>ODIY</strong><span>English</span></div><button className="close-mobile" onClick={() => setSidebarOpen(false)}><X size={18} /></button></div><button className="new-session" onClick={() => navigate("practice")}><Zap size={16} /> Start a practice session</button><div className="nav-label">Workspace</div><nav>{nav.map((item) => { const Icon = item.icon; return <button className={section === item.id ? "active" : ""} key={item.id} onClick={() => navigate(item.id)}><Icon size={17} /><span>{item.label}</span>{section === item.id && <i />}</button>; })}</nav><div className="sidebar-spacer" /><div className="streak-card"><div className="streak-icon"><Flame size={17} fill="currentColor" /></div><div><strong>{progress.streak} day streak</strong><span>Keep your momentum going</span></div></div><button className="sidebar-profile" onClick={() => navigate("progress")}><span className="avatar">{progress.name.charAt(0)}</span><span><strong>{progress.name}</strong><small>Band {progress.band.toFixed(1)} target</small></span><ChevronRight size={15} /></button></aside>
+    {sidebarOpen && <button className="backdrop" onClick={() => setSidebarOpen(false)} aria-label="Close navigation" />}
+    <main><header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button><div className="breadcrumbs"><span>ODIY English</span><ChevronRight size={14} /><strong>{pageTitle}</strong></div><div className="topbar-right"><div className="top-pill"><Flame size={15} /> {progress.streak}</div><div className="top-pill"><Trophy size={15} /> {progress.xp} XP</div><button className="top-avatar" onClick={() => navigate("progress")}>{progress.name.charAt(0)}</button></div></header>
+      <div className="content">
+        {section === "home" && <><section className="hero-grid"><div className="hero-card"><div className="eyebrow"><span /> IELTS PREPARATION, REIMAGINED</div><h1>Build the English<br /><em>you can rely on.</em></h1><p>Personalised practice, honest feedback, and a clear path to your target IELTS band.</p><div className="hero-actions"><button className="primary" onClick={() => navigate("practice")}>Continue practice <ArrowRight size={16} /></button><button className="secondary" onClick={() => navigate("tutor")}><Sparkles size={16} /> Ask AI tutor</button></div><div className="hero-stats"><div><strong>{progress.band.toFixed(1)}</strong><span>Estimated band</span></div><div><strong>{progress.completed.length + 12}</strong><span>Sessions completed</span></div><div><strong>{progress.words}</strong><span>Words mastered</span></div></div></div><div className="panel daily-card"><div className="panel-head"><div><span className="eyebrow">TODAY'S PLAN</span><h2>Small steps, real progress</h2></div><span className="date-chip">8 MIN LEFT</span></div><div className="plan-item" onClick={() => { setSkill("reading"); navigate("practice"); }}><IconBox tone="purple"><BookOpen size={17} /></IconBox><span><strong>Reading warm-up</strong><small>Urban green spaces · 3 questions</small></span><b>8 min</b><ChevronRight size={16} /></div><div className="plan-item" onClick={() => navigate("tutor")}><IconBox tone="blue"><Sparkles size={17} /></IconBox><span><strong>AI feedback session</strong><small>Review a paragraph with your tutor</small></span><b>10 min</b><ChevronRight size={16} /></div><button className="text-button" onClick={() => navigate("practice")}>View full study plan <ArrowRight size={15} /></button></div></section><section className="section-block"><div className="section-head"><div><span className="eyebrow">YOUR IELTS PROFILE</span><h2>Skills snapshot</h2></div><button className="text-button" onClick={() => navigate("progress")}>See analytics <ArrowRight size={15} /></button></div><div className="skill-grid">{(Object.keys(skillMeta) as Skill[]).map((item) => { const meta = skillMeta[item]; const Icon = meta.icon; return <button className="skill-card" key={item} onClick={() => { setSkill(item); navigate("practice"); }}><IconBox tone={meta.tone}><Icon size={18} /></IconBox><span><strong>{meta.label}</strong><small>Practice set ready</small></span><div className="skill-score"><b>{meta.score.toFixed(1)}</b><small>band</small></div><ChevronRight size={16} /></button>; })}</div></section><section className="dashboard-grid"><div className="panel insight-panel"><div className="panel-head"><div><span className="eyebrow">RECOMMENDED NEXT</span><h2>Improve your coherence</h2></div><IconBox tone="orange"><Lightbulb size={17} /></IconBox></div><p>Your Writing score is improving. Focus on linking ideas with precise connectors and stronger topic sentences.</p><button className="secondary" onClick={() => navigate("tutor")}>Review with AI tutor <ArrowRight size={15} /></button></div><div className="panel progress-panel"><div className="panel-head"><div><span className="eyebrow">WEEKLY GOAL</span><h2>4 of 5 sessions</h2></div><strong className="goal-percent">80%</strong></div><ProgressBar value={80} tone="blue" /><div className="week-dots">{["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span className={index < 4 ? "done" : index === 4 ? "today" : ""} key={`${day}-${index}`}>{day}</span>)}</div></div></section></>}
 
-  const navItems: Array<{ id: Section; label: string; icon: typeof Home }> = [
-    { id: "home", label: "Dashboard", icon: Home },
-    { id: "lessons", label: "O‘quv rejasi", icon: BookOpen },
-    { id: "ielts", label: "Mock tests", icon: GraduationCap },
-    { id: "vocabulary", label: "Vocabulary", icon: BookText },
-    { id: "grammar", label: "Grammar", icon: Brain },
-    { id: "listening", label: "Listening", icon: Headphones },
-    { id: "speaking", label: "Speaking", icon: Mic },
-    { id: "tests", label: "Quick tests", icon: CheckCircle2 },
-    { id: "progress", label: "Statistika", icon: Trophy },
-  ];
+        {section === "practice" && <section className="page"><div className="page-intro"><div className="eyebrow"><span /> FOCUSED PRACTICE</div><h1>Practice with <em>purpose.</em></h1><p>Build confidence across every IELTS skill with timed tasks and instant progress updates.</p></div><div className="practice-tabs">{(Object.keys(skillMeta) as Skill[]).map((item) => { const meta = skillMeta[item]; const Icon = meta.icon; return <button className={skill === item ? "active" : ""} onClick={() => { setSkill(item); setAnswers([]); }} key={item}><Icon size={16} /> {meta.label}</button>; })}</div><div className="practice-layout"><div className="panel practice-main">{skill === "reading" && <><div className="task-meta"><span>IELTS READING · PART 1</span><span className="timer"><Clock3 size={15} /> 18:00</span></div><h2>Urban green spaces</h2><p className="task-intro">Read the passage, then choose the best answer for each question.</p><div className="reading-passage">{readingText}</div>{readingQuestions.map((item, index) => <div className="question" key={item.q}><strong>{index + 1}. {item.q}</strong><div className="options">{item.options.map((option, optionIndex) => <button className={answers[index] === optionIndex ? "chosen" : ""} key={option} onClick={() => setAnswers((old) => { const next = [...old]; next[index] = optionIndex; return next; })}>{String.fromCharCode(65 + optionIndex)}<span>{option}</span></button>)}</div></div>)}<button className="primary" onClick={() => { updateSkill("reading", 6.5 + correctReading * .5); complete(`reading-${Date.now()}`, 30); }}>Submit answers <Check size={16} /></button></>}{skill === "listening" && <><div className="task-meta"><span>IELTS LISTENING · SECTION 1</span><span className="timer"><Clock3 size={15} /> 10:00</span></div><h2>Library workshop registration</h2><p className="task-intro">Listen twice, note the details, and answer the question below.</p><div className="audio-player"><div className="audio-wave">{Array.from({ length: 24 }, (_, i) => <i style={{ height: `${20 + (i * 17) % 58}%` }} key={i} />)}</div><button className="play-button" onClick={() => speak(listeningScript)}><Play size={19} fill="currentColor" /></button><div><strong>Practice audio</strong><span>00:58 · A2–B1</span></div><button className="audio-volume" onClick={() => speak(listeningScript)}><Volume2 size={17} /></button></div><div className="question"><strong>When will the workshop take place?</strong><div className="options">{["Wednesday at 6:30", "Thursday at 6:30", "Thursday at 8:30"].map((option, index) => <button className={listeningAnswer === index ? "chosen" : ""} key={option} onClick={() => setListeningAnswer(index)}>{String.fromCharCode(65 + index)}<span>{option}</span></button>)}</div></div><button className="secondary" onClick={() => setListeningAnswer(null)}>Reset answer <RotateCcw size={15} /></button></>}{skill === "writing" && <><div className="task-meta"><span>IELTS WRITING · TASK 2</span><span className="timer"><Clock3 size={15} /> 40:00</span></div><h2>Online learning and traditional classrooms</h2><p className="task-intro">Some people believe online learning is more effective than classroom learning. To what extent do you agree or disagree?</p><div className="writing-guidance"><Lightbulb size={17} /><span>Use a clear position, two developed ideas, and linking phrases. Aim for at least 250 words.</span></div><textarea className="essay" value={writingText} onChange={(event) => setWritingText(event.target.value)} placeholder="Start writing your response here..." /><div className="essay-toolbar"><span>{wordCount} words</span><button className="primary" onClick={() => { updateSkill("writing", wordCount > 180 ? 6.5 : 6.0); complete(`writing-${Date.now()}`, 30); navigate("tutor"); setTutorInput(`Please give IELTS feedback on this writing: ${writingText}`); }}>Get AI feedback <Sparkles size={16} /></button></div></>}{skill === "speaking" && <><div className="task-meta"><span>IELTS SPEAKING · PART 2</span><span className="timer"><Clock3 size={15} /> 01:00 prep</span></div><h2>Describe a skill you learned</h2><p className="task-intro">You should say what it is, when you learned it, how you learned it, and why it is useful.</p><div className="speaking-prompt"><IconBox tone="green"><Mic size={19} /></IconBox><span><strong>Take a moment to plan</strong><small>Then speak for 1–2 minutes using the microphone.</small></span></div><div className="record-row"><button className={`record-button ${isRecording ? "recording" : ""}`} onClick={isRecording ? stopRecognition : startRecognition}>{isRecording ? <MicOff size={18} /> : <Mic size={18} />}{isRecording ? "Stop recording" : "Start speaking"}</button><span>{isRecording ? "Listening to your answer…" : "Your transcript will appear below"}</span></div><textarea className="transcript-input" value={speakingText} onChange={(event) => setSpeakingText(event.target.value)} placeholder="Or type your answer here..." /><button className="primary" onClick={() => { updateSkill("speaking", 6.5); complete(`speaking-${Date.now()}`, 25); navigate("tutor"); setTutorInput(`Please evaluate my IELTS speaking response: ${speakingText}`); }}>Get speaking feedback <Sparkles size={16} /></button></>}</div><aside className="practice-side"><div className="panel mock-card"><div className="mock-icon"><Clock3 size={18} /></div><span className="eyebrow">FULL MOCK EXAM</span><h3>Ready for a challenge?</h3><p>Simulate all four sections with a real exam timer and a band estimate.</p><div className="mock-stats"><span><strong>2h 45m</strong>estimated time</span><span><strong>4</strong>sections</span></div><button className="primary full" onClick={() => { setExamRunning(true); setSeconds(1800); }}>Start mock exam <ArrowRight size={15} /></button>{examRunning && <div className="exam-running"><strong>{String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}</strong><span>Mock timer is running</span></div>}</div><div className="panel tip-card"><Lightbulb size={17} /><strong>Exam tip</strong><p>Answer every question. IELTS does not penalise incorrect guesses.</p></div></aside></div></section>}
 
-  const startRecognition = () => {
-    const targetWindow = window as Window & { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor };
-    const Recognition = targetWindow.SpeechRecognition || targetWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      setSpokenText("Bu brauzer ovoz tanishni qo‘llamaydi. Chrome’da qayta urinib ko‘ring yoki javobingizni yozing.");
-      return;
-    }
-    const recognition = new Recognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((item) => item[0].transcript).join(" ");
-      setSpokenText(transcript);
-    };
-    recognition.onerror = (event) => {
-      setSpokenText("Mikrofon xatosi: " + (event.error || "noma’lum xato"));
-      setIsRecording(false);
-    };
-    recognition.onend = () => setIsRecording(false);
-    try {
-      setRecognition(recognition);
-      recognition.start();
-      setIsRecording(true);
-      setSpokenText("Listening... Speak in English.");
-    } catch {
-      setSpokenText("Mikrofonni ishga tushirib bo‘lmadi. Brauzer ruxsatini tekshiring.");
-      setIsRecording(false);
-    }
-  };
+        {section === "tutor" && <section className="page"><div className="page-intro"><div className="eyebrow"><span /> PERSONAL AI COACH</div><h1>Feedback that helps you <em>move forward.</em></h1><p>ODIY AI spots patterns in your English, explains them clearly, and gives you a practical next step.</p></div><div className="tutor-layout"><div className="panel tutor-chat"><div className="chat-head"><div className="ai-avatar"><Sparkles size={18} /></div><div><strong>ODIY AI Tutor</strong><span>IELTS-aware English feedback</span></div><span className="online-dot">Online</span></div><div className="messages">{tutorMessages.map((message, index) => <div className={`message ${message.role}`} key={`${message.role}-${index}`}><span>{message.content}</span></div>)}{tutorLoading && <div className="message assistant"><span className="typing">Reviewing your English…</span></div>}</div><div className="suggestions"><button onClick={() => setTutorInput("Improve this sentence: People should use public transport because it is good.")}>Improve a sentence</button><button onClick={() => setTutorInput("Give me an IELTS writing task 2 structure.")}>Plan an essay</button><button onClick={() => setTutorInput("How can I sound more natural in speaking?")}>Speaking advice</button></div><div className="chat-input"><textarea value={tutorInput} onChange={(event) => setTutorInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); tutorSend(); } }} placeholder="Ask for feedback on your English..." /><button className="send-button" onClick={tutorSend}><Send size={17} /></button></div><small className="chat-note">AI feedback is educational guidance, not an official IELTS score.</small></div><aside className="tutor-side"><div className="panel tutor-feature"><IconBox tone="purple"><Target size={18} /></IconBox><h3>What you get</h3><ul><li><Check size={15} /> Grammar corrections with explanations</li><li><Check size={15} /> Vocabulary and natural phrasing</li><li><Check size={15} /> IELTS criterion-based advice</li><li><Check size={15} /> One clear next step</li></ul></div><div className="panel tutor-feature blue"><IconBox tone="blue"><BarChart3 size={18} /></IconBox><h3>Your focus area</h3><p>Coherence and cohesion</p><ProgressBar value={68} tone="blue" /><small>Based on your recent practice</small></div></aside></div></section>}
 
-  const stopRecognition = () => {
-    recognition?.stop();
-    setIsRecording(false);
-  };
+        {section === "vocabulary" && <section className="page"><div className="page-intro"><div className="eyebrow"><span /> VOCABULARY BUILDER</div><h1>Words worth <em>remembering.</em></h1><p>Learn high-impact academic vocabulary in context, then use it in your own sentences.</p></div><div className="vocab-layout"><div><div className={`flashcard ${vocabFlipped ? "flipped" : ""}`} onClick={() => setVocabFlipped((value) => !value)}><span className="card-count">{vocabIndex + 1} / {vocabulary.length}</span><div className="card-word">{vocabFlipped ? vocabulary[vocabIndex][2] : vocabulary[vocabIndex][0]}</div><div className="card-phonetic">{vocabFlipped ? vocabulary[vocabIndex][3] : vocabulary[vocabIndex][1]}</div><span className="flip-label"><RotateCcw size={14} /> Click to flip</span></div><div className="card-actions"><button className="secondary" onClick={() => speak(vocabulary[vocabIndex][0])}><Volume2 size={16} /> Hear pronunciation</button><button className="primary" onClick={() => { setVocabIndex((vocabIndex + 1) % vocabulary.length); setVocabFlipped(false); setProgress((old) => ({ ...old, words: old.words + 1, xp: old.xp + 3 })); }}>Next word <ArrowRight size={16} /></button></div></div><div className="panel word-set"><div className="panel-head"><div><span className="eyebrow">TODAY'S SET</span><h2>Academic essentials</h2></div><span className="set-progress">{progress.words} learned</span></div>{vocabulary.map((item, index) => <button className={vocabIndex === index ? "current" : ""} key={item[0]} onClick={() => { setVocabIndex(index); setVocabFlipped(false); }}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item[0]}</strong><small>{item[1]}</small><ChevronRight size={15} /></button>)}</div></div></section>}
 
-  const titleMap: Record<Section, string> = {
-    home: "Bosh sahifa", lessons: "Barcha darslar", vocabulary: "Lug‘at mashqi",
-    grammar: "Grammatika", listening: "Listening", speaking: "Speaking",
-    tests: "Bilimni sinash", ielts: "IELTS tayyorgarlik", progress: "Mening natijalarim",
-  };
+        {section === "grammar" && <section className="page"><div className="page-intro"><div className="eyebrow"><span /> GRAMMAR LAB</div><h1>Make accuracy your <em>advantage.</em></h1><p>Short explanations, useful examples, and focused questions that target your next improvement.</p></div><div className="grammar-layout"><div className="panel theory"><span className="lesson-tag">B2 · CONDITIONALS</span><h2>Second conditional</h2><p>Use it to talk about imaginary or unlikely situations in the present or future.</p><div className="formula">If + past simple, would + base verb</div><div className="example-cards"><div><strong>If I had more time,</strong><span>I would volunteer more.</span></div><div><strong>She would travel</strong><span>if she saved enough money.</span></div></div><div className="tip"><Lightbulb size={16} /> In formal writing, this structure is useful for discussing hypothetical solutions.</div></div><div className="panel grammar-quiz"><div className="task-meta"><span>QUICK PRACTICE</span><span>{grammarIndex + 1} / {grammarQuestions.length}</span></div><h3>{grammarQuestions[grammarIndex][0]}</h3><div className="options">{(grammarQuestions[grammarIndex][1] as string[]).map((option, index) => <button className={grammarAnswer === index ? (index === grammarQuestions[grammarIndex][2] ? "correct" : "wrong") : ""} key={option} onClick={() => setGrammarAnswer(index)}>{String.fromCharCode(65 + index)}<span>{option}</span></button>)}</div>{grammarAnswer !== null && <div className="feedback"><strong>{grammarAnswer === grammarQuestions[grammarIndex][2] ? "Correct." : "Not quite."}</strong> Use “had” with the second conditional to describe an unreal present situation.</div>}<button className="primary full" disabled={grammarAnswer === null} onClick={() => { setGrammarAnswer(null); if (grammarIndex === grammarQuestions.length - 1) complete("grammar-set", 20); setGrammarIndex((grammarIndex + 1) % grammarQuestions.length); }}>Next question <ArrowRight size={15} /></button></div></div></section>}
 
-  const filteredLessons = lessonCards.filter((lesson) => (lesson.title + " " + lesson.subtitle + " " + lesson.level).toLowerCase().includes(searchText.toLowerCase()));
-
-  return (
-    <div className="english-app">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-      <aside className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}>
-        <div className="brand-lockup">
-          <div className="brand-icon"><Sparkles size={21} /></div>
-          <div><strong>ODIY</strong><em>English</em></div>
-          <button className="icon-button sidebar-close" onClick={() => setSidebarOpen(false)}><X size={19} /></button>
-        </div>
-        <button className="sidebar-start" onClick={() => changeSection("home")}><Home size={17} /> Bosh sahifa</button>
-        <div className="sidebar-caption">O‘RGANISH</div>
-        <nav className="side-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return <button key={item.id} className={section === item.id ? "selected" : ""} onClick={() => changeSection(item.id)}><Icon size={17} /><span>{item.label}</span>{section === item.id && <i />}</button>;
-          })}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="side-streak"><Flame size={18} fill="#ff9d56" /><div><strong>{progress.streak} kunlik seriya</strong><span>Davom et! Zo‘r ketyapsan.</span></div></div>
-          <div className="side-profile"><div className="profile-avatar">B</div><div><strong>{progress.name}</strong><span>{progress.level}</span></div><ChevronDown size={16} /></div>
-          <small>ODIY English • 1.0.0</small>
-        </div>
-      </aside>
-      {sidebarOpen && <button className="mobile-backdrop" onClick={() => setSidebarOpen(false)} aria-label="Menyuni yopish" />}
-
-      <main className="main-area">
-        <header className="topbar">
-          <button className="icon-button mobile-menu" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
-          <div className="breadcrumb"><span>ODIY English</span><ChevronRight size={14} /><strong>{titleMap[section]}</strong></div>
-          <div className="topbar-actions">
-            <div className="search-box"><Search size={16} /><input value={searchText} onChange={(event) => { setSearchText(event.target.value); if (section !== "lessons") setSection("lessons"); }} placeholder="Dars qidirish..." /></div>
-            <div className="top-stat"><Flame size={16} fill="#ff9b4a" /><strong>{progress.streak}</strong></div>
-            <div className="top-stat"><Star size={16} fill="#ffd15a" color="#ffd15a" /><strong>{progress.xp} XP</strong></div>
-            <button className="profile-mini" onClick={() => changeSection("progress")}>B</button>
-          </div>
-        </header>
-
-        <section className="page-content">
-          {section === "home" && (
-            <>
-              <div className="welcome-grid">
-                <div className="welcome-copy">
-                  <span className="eyebrow"><span /> ODIY ENGLISH • IELTS PREP</span>
-                  <h1>IELTS maqsadingga<br /><span>ishonch bilan bor.</span></h1>
-                  <p>Listening, Reading, Writing va Speaking mashqlarini bir joyda bajar. Rejangni kuzat va har kuni oz-ozdan rivojlan.</p>
-                  <div className="welcome-buttons">
-                    <button className="primary-button" onClick={() => changeSection("ielts")}>Mock testni boshlash <ArrowRight size={17} /></button>
-                    <button className="soft-button" onClick={() => changeSection("lessons")}>O‘quv rejam</button>
-                  </div>
-                  <div className="welcome-metrics">
-                    <div><strong>{progress.words}</strong><span>o‘rganilgan so‘z</span></div>
-                    <div><strong>{progress.completed.length}</strong><span>bajarilgan mashq</span></div>
-                    <div><strong>{progress.streak}</strong><span>kunlik seriya</span></div>
-                  </div>
-                </div>
-                <div className="panel today-plan-card">
-                  <div className="panel-heading">
-                    <div><span className="eyebrow">DAILY STUDY PLAN</span><h3>Bugungi reja</h3></div>
-                    <span className="plan-date">TODAY</span>
-                  </div>
-                  <button className="today-plan-row" onClick={() => changeSection("listening")}>
-                    <span className="plan-icon listening"><Headphones size={18} /></span>
-                    <span><b>Listening practice</b><small>Audio va tushunish mashqi</small></span>
-                    <em>15 min</em><ChevronRight size={16} />
-                  </button>
-                  <button className="today-plan-row" onClick={() => changeSection("vocabulary")}>
-                    <span className="plan-icon vocabulary"><BookText size={18} /></span>
-                    <span><b>Vocabulary review</b><small>Yangi so‘zlarni takrorlash</small></span>
-                    <em>10 min</em><ChevronRight size={16} />
-                  </button>
-                  <button className="today-plan-row" onClick={() => { setIeltsTab("writing"); changeSection("ielts"); }}>
-                    <span className="plan-icon writing"><BookOpen size={18} /></span>
-                    <span><b>Writing task</b><small>Qisqa essay mashqi</small></span>
-                    <em>20 min</em><ChevronRight size={16} />
-                  </button>
-                  <button className="plan-start-button" onClick={() => changeSection("ielts")}>Barcha mashqlar <ArrowRight size={15} /></button>
-                </div>
-              </div>
-
-              <div className="section-heading"><div><span className="eyebrow">IELTS SKILLS</span><h2>Qaysi ko‘nikmani mashq qilamiz?</h2></div><button className="text-link" onClick={() => changeSection("ielts")}>Mock testlar <ArrowRight size={15} /></button></div>
-              <div className="skill-grid">
-                <button className="skill-card" onClick={() => changeSection("listening")}><span className="skill-card-icon listening"><Headphones size={21} /></span><span className="skill-card-copy"><b>Listening</b><small>Audio tinglash va savollar</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
-                <button className="skill-card" onClick={() => { setIeltsTab("reading"); changeSection("ielts"); }}><span className="skill-card-icon reading"><BookOpen size={21} /></span><span className="skill-card-copy"><b>Reading</b><small>Matn va savollar ustida ishlash</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
-                <button className="skill-card" onClick={() => { setIeltsTab("writing"); changeSection("ielts"); }}><span className="skill-card-icon writing"><BookText size={21} /></span><span className="skill-card-copy"><b>Writing</b><small>Task 1 va Task 2 yozish</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
-                <button className="skill-card" onClick={() => { setIeltsTab("speaking"); changeSection("ielts"); }}><span className="skill-card-icon speaking"><Mic size={21} /></span><span className="skill-card-copy"><b>Speaking</b><small>Javob berish va gapirish</small></span><span className="skill-card-tag">PRACTICE</span><ArrowRight size={17} /></button>
-              </div>
-
-              <div className="section-heading"><div><span className="eyebrow">LEARNING PATH</span><h2>Qayerdan boshlaymiz?</h2></div><button className="text-link" onClick={() => changeSection("lessons")}>Barcha darslar <ArrowRight size={15} /></button></div>
-              <div className="module-grid">
-                {modules.map((item) => {
-                  const Icon = item.icon;
-                  return <button key={item.id} className={"module-card " + item.color} onClick={() => changeSection(item.id)}><div className="module-icon"><Icon size={22} /></div><div className="module-arrow"><ArrowUpRightIcon /></div><strong>{item.title}</strong><span>{item.subtitle}</span><small>{item.count}</small></button>;
-                })}
-              </div>
-
-              <div className="lower-grid">
-                <div className="panel lesson-panel">
-                  <div className="panel-heading"><div><span className="eyebrow">CONTINUE LEARNING</span><h3>Davom ettirish</h3></div><button className="icon-button" onClick={() => changeSection("lessons")}><ArrowRight size={17} /></button></div>
-                  <div className="continue-lesson"><div className="lesson-emoji">🧩</div><div className="lesson-detail"><small>A2 • GRAMMAR</small><strong>Present Simple Tense</strong><span>Oddiy hozirgi zamon</span><ProgressBar value={progress.completed.includes("present") ? 100 : 48} /></div><button className="round-play" onClick={() => { setActiveLesson("present"); changeSection("lessons"); }}><Play size={16} fill="currentColor" /></button></div>
-                </div>
-                <div className="panel daily-panel"><div className="panel-heading"><div><span className="eyebrow">WORD OF THE DAY</span><h3>Bugungi so‘z</h3></div><div className="daily-spark"><Lightbulb size={19} /></div></div><div className="daily-word">Resilient</div><div className="phonetic">/rɪˈzɪliənt/ • adjective</div><p>Qiyinchilikdan keyin yana tiklana oladigan, bardoshli.</p><button className="listen-word" onClick={() => speakEnglish("Resilient. She is a resilient person.")}><Volume2 size={15} /> Talaffuzini eshitish</button></div>
-              </div>
-            </>
-          )}
-
-          {section === "lessons" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">YOUR LEARNING PATH</span><h1>O‘rganishni <span>boshlaymiz.</span></h1><p>Darajangga mos darsni tanla. Har bir dars kichik mashqlar va yakuniy testdan iborat.</p></div>
-              <div className="level-strip"><div><span>HOZIRGI DARAJA</span><strong>{progress.level}</strong></div><div><span>KEYINGI MAQSAD</span><strong>B1 — Intermediate</strong></div><div><span>JAMI XP</span><strong>{progress.xp} XP</strong></div></div>
-              <div className="lesson-list">
-                {filteredLessons.map((lesson, index) => <div className="lesson-row" key={lesson.id}><div className="lesson-row-icon">{lesson.icon}</div><div className="lesson-row-content"><div className="lesson-meta"><span>{lesson.level}</span><span>{lesson.tag}</span><span><Clock3 size={12} /> {lesson.duration}</span></div><strong>{lesson.title}</strong><p>{lesson.subtitle}</p></div><div className="lesson-row-status">{progress.completed.includes(lesson.id) ? <span className="completed-label"><Check size={13} /> Tugallangan</span> : <span>{index + 1}-dars</span>}<button className="primary-button small" onClick={() => { setActiveLesson(lesson.id); setLessonDone(false); }}>{progress.completed.includes(lesson.id) ? "Takrorlash" : "Boshlash"} <ArrowRight size={14} /></button></div></div>)}
-                {filteredLessons.length === 0 && <div className="empty-state">Bu so‘z bo‘yicha dars topilmadi. Boshqa nom bilan qidirib ko‘r.</div>}
-              </div>
-              {lessonDone && <div className="success-banner"><CheckCircle2 /> Dars tugadi! +20 XP qo‘shildi.</div>}
-              <div className="lesson-detail-panel">
-                <div className="lesson-detail-top"><div className="lesson-emoji large">📘</div><div><span className="eyebrow">SELECTED LESSON</span><h3>{lessonCards.find((item) => item.id === activeLesson)?.title || "Present Simple"}</h3><p>Qoidani o‘rgan, misollarni ko‘r va mashqni bajar.</p></div></div>
-                <div className="lesson-content-box"><h4>Present Simple — oddiy hozirgi zamon</h4><p>Present Simple odatlar, kundalik ishlar va doimiy holatlar haqida gapirganda ishlatiladi.</p><div className="example-list"><div><b>I / You / We / They</b><span>work, play, study</span><em>I study English every day.</em></div><div><b>He / She / It</b><span>works, plays, studies</span><em>She studies English every day.</em></div></div><div className="lesson-tip"><Lightbulb size={17} /> He, She, It bilan darak gapda fe’lga odatda -s yoki -es qo‘shiladi.</div></div>
-                <button className="primary-button" onClick={() => { complete(activeLesson); setLessonDone(true); }}>Darsni tugatish <Check size={16} /></button>
-              </div>
-            </div>
-          )}
-
-          {section === "vocabulary" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">BUILD YOUR WORD POWER</span><h1>So‘z boyligingni <span>oshir.</span></h1><p>So‘zni eslab qol, talaffuzini tingla va uni gapda ishlat.</p></div>
-              <div className="vocab-layout">
-                <div className="vocab-card-wrap"><div className="flashcard" onClick={() => setShowTranslation(!showTranslation)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") setShowTranslation(!showTranslation); }}><div className="flashcard-top"><span>{vocabulary[wordIndex].note}</span><span>{wordIndex + 1} / {vocabulary.length}</span></div><div className="flashcard-word">{showTranslation ? vocabulary[wordIndex].translation : vocabulary[wordIndex].word}</div><div className="flashcard-phonetic">{showTranslation ? "Tarjimasi" : vocabulary[wordIndex].phonetic}</div><div className="flashcard-example">{showTranslation ? vocabulary[wordIndex].example : "Kartani ochish uchun bosing"}</div><span className="flip-hint"><RotateCcw size={14} /> {showTranslation ? "Asl so‘zga qaytish" : "Tarjimani ko‘rish"}</span></div><div className="flashcard-actions"><button className="soft-button" onClick={() => speakEnglish(vocabulary[wordIndex].word)}><Volume2 size={16} /> Talaffuz</button><button className="primary-button" onClick={() => { setWordIndex((wordIndex + 1) % vocabulary.length); setShowTranslation(false); setProgress((old) => ({ ...old, words: old.words + 1, xp: old.xp + 3 })); }}>Keyingi so‘z <ArrowRight size={16} /></button></div></div>
-                <div className="panel vocab-side"><span className="eyebrow">TODAY'S WORD SET</span><h3>Bugungi 6 ta so‘z</h3><p>Har bir so‘zni talaffuzi va misoli bilan o‘rgan.</p>{vocabulary.map((item, index) => <button className={"word-list-item " + (index === wordIndex ? "current" : "")} key={item.word} onClick={() => { setWordIndex(index); setShowTranslation(false); }}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.word}</b><small>{item.translation}</small><ChevronRight size={15} /></button>)}</div>
-              </div>
-            </div>
-          )}
-
-          {section === "grammar" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">GRAMMAR MADE SIMPLE</span><h1>Grammatikani <span>oson o‘rgan.</span></h1><p>Qoidani o‘qi, misollarni solishtir va qisqa mashqda bilimni mustahkamla.</p></div>
-              <div className="grammar-layout"><div className="panel grammar-theory"><div className="grammar-badge">A2 • TENSES</div><h2>Present Simple</h2><p>Bu zamon odatlar, jadval va o‘zgarmas faktlar uchun ishlatiladi.</p><div className="formula-box"><span>Darak</span><strong>Subject + V1 (he/she/it + s)</strong></div><div className="formula-box"><span>Inkor</span><strong>Subject + do/does + not + V1</strong></div><div className="formula-box"><span>Savol</span><strong>Do/Does + subject + V1?</strong></div><h4>Misollar</h4><ul className="grammar-examples"><li><b>I work</b> from home. <span>Men uydan ishlayman.</span></li><li><b>She works</b> from home. <span>U uydan ishlaydi.</span></li><li><b>Do you work</b> here? <span>Siz shu yerda ishlaysizmi?</span></li><li><b>He doesn't work</b> here. <span>U bu yerda ishlamaydi.</span></li></ul><div className="lesson-tip"><Lightbulb size={17} /> Does ishlatilganda asosiy fe’lga -s qo‘shilmaydi.</div></div><div className="panel grammar-quiz"><span className="eyebrow">QUICK PRACTICE • {grammarIndex + 1}/{grammarQuestions.length}</span><h3>To‘g‘ri javobni tanla</h3><div className="quiz-question">{grammarQuestions[grammarIndex].question}</div><div className="answer-options">{grammarQuestions[grammarIndex].options.map((option, index) => <button key={option} className={grammarAnswer === index ? (index === grammarQuestions[grammarIndex].correct ? "correct" : "wrong") : ""} onClick={() => setGrammarAnswer(index)}>{String.fromCharCode(65 + index)} <span>{option}</span>{grammarAnswer === index && (index === grammarQuestions[grammarIndex].correct ? <Check size={17} /> : <X size={17} />)}</button>)}</div>{grammarAnswer !== null && <div className="explain-box">{grammarAnswer === grammarQuestions[grammarIndex].correct ? "Ajoyib! To‘g‘ri javob." : "Bu safar xato. "}{grammarQuestions[grammarIndex].explain}</div>}<button className="primary-button full" disabled={grammarAnswer === null} onClick={() => { setGrammarAnswer(null); if (grammarIndex === grammarQuestions.length - 1) { setGrammarIndex(0); complete("grammar-present"); } else setGrammarIndex(grammarIndex + 1); }}>Keyingi savol <ArrowRight size={15} /></button></div></div>
-            </div>
-          )}
-
-          {section === "listening" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">TRAIN YOUR EAR</span><h1>Tingla va <span>tushun.</span></h1><p>Audio matnni eshit, asosiy fikrlarni ajrat va savollarga javob ber.</p></div>
-              <div className="panel listening-panel"><div className="audio-art"><div className="audio-orb"><Headphones size={34} /></div><div className="sound-bars"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div></div><div className="audio-info"><span className="eyebrow">A2 • EVERYDAY ENGLISH</span><h2>A day in Alex's life</h2><p>Alexning kundalik hayoti haqida qisqa audio.</p><button className="primary-button" onClick={() => speakEnglish(listeningScript)}><Play size={16} fill="currentColor" /> Audioni tinglash</button><button className="soft-button" onClick={() => window.speechSynthesis?.cancel()}><X size={15} /> To‘xtatish</button></div></div>
-              <div className="panel listening-task"><span className="eyebrow">LISTENING CHECK</span><h3>Alex qayerda ishlaydi?</h3><div className="answer-options horizontal">{["In a school", "In a bookshop", "In a hospital"].map((option, index) => <button className={listeningAnswer === index ? (index === 1 ? "correct" : "wrong") : ""} key={option} onClick={() => setListeningAnswer(index)}>{option}</button>)}</div>{listeningAnswer !== null && <div className="explain-box">{listeningAnswer === 1 ? "To‘g‘ri! Alex kichik kitob do‘konida ishlaydi." : "Qayta tinglab ko‘r. Alex “I work in a small bookshop” deydi."}</div>}<div className="transcript-box"><button onClick={() => setShowTranslation(!showTranslation)}><ChevronDown size={15} /> {showTranslation ? "Transcriptni yashirish" : "Transcriptni ko‘rish"}</button>{showTranslation && <p>{listeningScript}</p>}</div></div>
-            </div>
-          )}
-
-          {section === "speaking" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">SPEAK WITH CONFIDENCE</span><h1>Ovozingni <span>mashq qil.</span></h1><p>Berilgan mavzuda inglizcha gapir. Brauzer ovozingni matnga aylantiradi.</p></div>
-              <div className="speaking-layout"><div className="panel speaking-card"><div className="speaking-prompt-banner"><span className="plan-icon speaking"><Mic size={22} /></span><span><b>IELTS SPEAKING</b><small>PART 2 • 1 minute to prepare</small></span></div><span className="eyebrow">TODAY'S SPEAKING TOPIC</span><h2>{speakingPrompts[progress.completed.length % speakingPrompts.length]}</h2><p>1 daqiqa davomida gapirishga harakat qil. Xatolardan qo‘rqma — mashq qilish muhim.</p><div className="record-controls"><button className={isRecording ? "record-button recording" : "record-button"} onClick={isRecording ? stopRecognition : startRecognition}>{isRecording ? <MicOff size={19} /> : <Mic size={19} />}{isRecording ? "To‘xtatish" : "Gapirishni boshlash"}</button><span>{isRecording ? "Ovoz tinglanmoqda..." : "Mikrofon ruxsati so‘ralishi mumkin"}</span></div></div><div className="panel transcript-panel"><span className="eyebrow">YOUR SPEECH</span><h3>Tanilgan matn</h3><div className="transcript-output">{spokenText || "Mikrofon tugmasini bosib inglizcha gapiring. Tanilgan so‘zlar shu yerda ko‘rinadi."}</div><div className="transcript-actions"><button className="soft-button" onClick={() => setSpokenText("")}><RotateCcw size={15} /> Tozalash</button><button className="primary-button" disabled={!spokenText.trim() || spokenText.startsWith("Mikrofon") || spokenText.startsWith("Bu brauzer")} onClick={() => { complete("speaking-" + progress.completed.length, 15); setSpokenText(spokenText + "\n\nODIY: Mashq uchun rahmat! Keyingi safar gaplaringni yanada ravon qilishga harakat qil."); }}>Mashqni saqlash <Check size={15} /></button></div><div className="lesson-tip"><Lightbulb size={16} /> Bu brauzer nutqni matnga aylantiradi. IELTS Speaking uchun rasmiy Band Score bermaydi.</div></div></div>
-            </div>
-          )}
-
-          {section === "tests" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">CHECK YOUR KNOWLEDGE</span><h1>Bilimingni <span>sinab ko‘r.</span></h1><p>5 ta savol. Har bir javobdan keyin izoh ko‘rasan.</p></div>
-              <div className="panel test-panel">{!testFinished ? <><div className="test-progress-top"><span>ENGLISH LEVEL CHECK</span><strong>{testIndex + 1} / {testQuestions.length}</strong></div><ProgressBar value={(testIndex / testQuestions.length) * 100} /><h2>{testQuestions[testIndex].question}</h2><div className="answer-options">{testQuestions[testIndex].options.map((option, index) => <button key={option} className={testAnswers[testIndex] === index ? "chosen" : ""} onClick={() => setTestAnswers((old) => { const next = [...old]; next[testIndex] = index; return next; })}>{String.fromCharCode(65 + index)} <span>{option}</span>{testAnswers[testIndex] === index && <Check size={16} />}</button>)}</div><div className="test-footer"><span>{testAnswers.filter((item) => item !== undefined).length} ta javob belgilandi</span><button className="primary-button" disabled={testAnswers[testIndex] === undefined} onClick={() => { if (testIndex === testQuestions.length - 1) { setTestFinished(true); const score = testAnswers.reduce((sum, answer, index) => sum + (answer === testQuestions[index].correct ? 1 : 0), 0); complete("general-test-" + Date.now(), score * 10); } else setTestIndex(testIndex + 1); }}>{testIndex === testQuestions.length - 1 ? "Natijani ko‘rish" : "Keyingi savol"} <ArrowRight size={15} /></button></div></> : <div className="test-result"><div className="result-trophy"><Trophy size={36} /></div><span className="eyebrow">TEST COMPLETED</span><h2>Test yakunlandi!</h2><strong>{testAnswers.reduce((sum, answer, index) => sum + (answer === testQuestions[index].correct ? 1 : 0), 0)} / {testQuestions.length}</strong><p>To‘g‘ri javoblar soni. Har bir xatodan yangi narsa o‘rganish mumkin.</p><div className="result-review">{testQuestions.map((item, index) => <div key={item.question}><span>{testAnswers[index] === item.correct ? <Check color="#5cd5a2" /> : <X color="#ff819a" />}</span><div><b>{item.question}</b><small>To‘g‘ri javob: {item.options[item.correct]}</small><em>{item.explain}</em></div></div>)}</div><button className="primary-button" onClick={() => { setTestIndex(0); setTestAnswers([]); setTestFinished(false); }}>Qayta ishlash <RotateCcw size={15} /></button></div>}</div>
-            </div>
-          )}
-
-          {section === "ielts" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">IELTS PREPARATION HUB</span><h1>IELTS maqsadingga <span>yaqinlash.</span></h1><p>To‘rt ko‘nikma bo‘yicha mashqlar, strategiyalar va sinov topshiriqlari.</p></div>
-              <div className="ielts-hero"><div><span className="eyebrow">YOUR TARGET BAND</span><h2>Band <span>7.0</span></h2><p>Reja asosida muntazam tayyorlan.</p></div><div className="ielts-ring"><strong>0.0</strong><span>practice score</span></div></div>
-              <div className="ielts-tabs">{(["reading", "listening", "writing", "speaking"] as const).map((item) => <button className={ieltsTab === item ? "active" : ""} key={item} onClick={() => setIeltsTab(item)}>{item === "reading" ? <BookOpen /> : item === "listening" ? <Headphones /> : item === "writing" ? <BookText /> : <Mic />}{item}</button>)}</div>
-              <div className="panel ielts-task">
-                {ieltsTab === "reading" && <><span className="eyebrow">IELTS READING • PRACTICE</span><h3>Why short breaks improve learning</h3><p>Read the passage and answer the questions. In a full IELTS test, Reading includes several passages and a strict time limit.</p><div className="reading-passage">{readingText}</div>{readingQuestions.map((q, index) => <div className="ielts-question" key={q.question}><b>{index + 1}. {q.question}</b><div className="answer-options compact-options">{q.options.map((option, optionIndex) => <button className={readingAnswers[index] === optionIndex ? "chosen" : ""} key={option} onClick={() => setReadingAnswers((old) => { const next = [...old]; next[index] = optionIndex; return next; })}>{option}</button>)}</div></div>)}<button className="primary-button" onClick={() => { const score = readingAnswers.reduce((sum, answer, index) => sum + (answer === readingQuestions[index].correct ? 1 : 0), 0); complete("ielts-reading-" + Date.now(), score * 10); }}>Reading mashqini tugatish <Check size={15} /></button></>}
-                {ieltsTab === "listening" && <><span className="eyebrow">IELTS LISTENING • PRACTICE</span><h3>Everyday conversation</h3><p>Matnni audio orqali tingla va asosiy ma’lumotlarni yozib ol. Bu namuna to‘liq IELTS testi emas.</p><div className="audio-mini"><AudioLines size={23} /><div><b>Practice audio</b><small>2 daqiqalik tinglash mashqi</small></div><button className="round-play" onClick={() => speakEnglish(listeningScript)}><Play size={14} fill="currentColor" /></button></div><button className="soft-button" onClick={() => window.speechSynthesis?.cancel()}>Audio to‘xtatish</button><div className="ielts-question"><b>Alex qaysi transportdan foydalanadi?</b><div className="answer-options compact-options">{["Car", "Bus", "Train"].map((option, index) => <button className={listeningAnswer === index ? "chosen" : ""} key={option} onClick={() => setListeningAnswer(index)}>{option}</button>)}</div>{listeningAnswer !== null && <div className="explain-box">{listeningAnswer === 1 ? "To‘g‘ri: “I walk to the bus stop.”" : "Yana bir bor tingla: Alex bekatgacha piyoda yuradi va avtobusga chiqadi."}</div>}</div></>}
-                {ieltsTab === "writing" && <><span className="eyebrow">IELTS WRITING • TASK 2</span><h3>Essay practice</h3><p>Some people believe that online learning is more effective than traditional classroom learning. To what extent do you agree or disagree?</p><div className="writing-guidance"><b>Maslahat</b><span>Fikr bildir, ikki asosiy dalil keltir va xulosada pozitsiyangni takrorla. Tavsiya etilgan hajm: 250+ so‘z.</span></div><textarea className="essay-input" value={writingText} onChange={(event) => setWritingText(event.target.value)} placeholder="Write your essay here..." /><div className="essay-footer"><span>{writingText.trim() ? writingText.trim().split(/\s+/).length : 0} words</span><button className="primary-button" onClick={() => { complete("ielts-writing-" + Date.now(), 15); }}>Draftni saqlash <Check size={15} /></button></div><div className="lesson-tip"><Lightbulb size={16} /> Hozircha avtomatik Band Score yo‘q. Bu mashq yozgan matningni saqlash uchun.</div></>}
-                {ieltsTab === "speaking" && <><span className="eyebrow">IELTS SPEAKING • PART 2</span><h3>Describe a skill you learned</h3><p>You should say what the skill is, when you learned it, how you learned it, and explain why it is useful.</p><div className="speaking-timer"><Clock3 size={18} /> 1 minute to prepare • 1–2 minutes to speak</div><button className="record-button" onClick={isRecording ? stopRecognition : startRecognition}>{isRecording ? <MicOff size={18} /> : <Mic size={18} />}{isRecording ? "Stop recording" : "Start speaking"}</button><div className="transcript-output">{spokenText || "Your recognised speech will appear here."}</div><div className="lesson-tip"><Lightbulb size={16} /> Bu mashqda javobingni mashq qilasan. Rasmiy IELTS band bahosi berilmaydi.</div></>}
-              </div>
-            </div>
-          )}
-
-          {section === "progress" && (
-            <div className="section-view">
-              <div className="page-intro"><span className="eyebrow">YOUR ACHIEVEMENTS</span><h1>Natijalaring <span>o‘smoqda.</span></h1><p>O‘rganish jarayoningni kuzat va keyingi maqsadni belgilab ol.</p></div>
-              <div className="stats-grid"><div className="panel stat-card"><Flame color="#ff9d56" /><strong>{progress.streak}</strong><span>Kunlik seriya</span></div><div className="panel stat-card"><Star color="#ffd15a" /><strong>{progress.xp}</strong><span>To‘plangan XP</span></div><div className="panel stat-card"><BookText color="#e29bff" /><strong>{progress.words}</strong><span>O‘rganilgan so‘z</span></div><div className="panel stat-card"><Trophy color="#80d8c3" /><strong>{progress.completed.length}</strong><span>Tugallangan dars</span></div></div>
-              <div className="panel progress-detail"><span className="eyebrow">CURRENT LEVEL</span><h2>{progress.level}</h2><p>Keyingi darajaga o‘tish uchun har kuni kichik mashqlarni bajaring.</p><ProgressBar value={Math.min(100, (progress.xp % 500) / 5)} /><div className="progress-line-labels"><span>{progress.xp % 500} / 500 XP</span><span>B1 — Intermediate</span></div></div>
-              <div className="panel profile-settings"><div><span className="eyebrow">PROFILE</span><h3>Ismingni o‘zgartir</h3><p>Darslar sahifasida ko‘rinadigan ism.</p></div><input value={progress.name} onChange={(event) => setProgress((old) => ({ ...old, name: event.target.value.slice(0, 24) }))} placeholder="Isming" /></div>
-              <div className="panel reset-panel"><div><strong>O‘quv natijalarini tozalash</strong><p>Bu amal faqat shu brauzerda saqlangan XP va tugallangan darslarni o‘chiradi.</p></div><button className="soft-button danger" onClick={() => { setProgress(initialProgress); localStorage.removeItem(STORAGE_KEY); }}>Tozalash <RotateCcw size={14} /></button></div>
-            </div>
-          )}
-        </section>
-        <footer className="page-footer"><span>© 2026 ODIY English</span><span>Learn a little every day <Heart size={11} fill="currentColor" /></span><span>Made for curious minds</span></footer>
-      </main>
-    </div>
-  );
+        {section === "progress" && <section className="page"><div className="page-intro"><div className="eyebrow"><span /> PROGRESS & ANALYTICS</div><h1>See your progress, <em>clearly.</em></h1><p>Your estimated band is a guide to help you decide what to practise next—not a prediction of an official result.</p></div><div className="analytics-top"><div className="panel band-card"><span className="eyebrow">ESTIMATED IELTS BAND</span><div className="band-value">{progress.band.toFixed(1)}</div><span className="band-change"><ArrowRight size={14} /> +0.5 this month</span><div className="band-scale"><span>4.0</span><ProgressBar value={62} tone="purple" /><span>9.0</span></div></div><div className="panel metric-card"><IconBox tone="orange"><Flame size={18} /></IconBox><strong>{progress.streak}</strong><span>day streak</span><small>Best: 14 days</small></div><div className="panel metric-card"><IconBox tone="blue"><Clock3 size={18} /></IconBox><strong>6.4h</strong><span>practice this week</span><small>+18% vs last week</small></div><div className="panel metric-card"><IconBox tone="green"><CheckCircle2 size={18} /></IconBox><strong>{progress.completed.length + 12}</strong><span>tasks completed</span><small>Keep it up</small></div></div><div className="analytics-grid"><div className="panel skill-breakdown"><div className="panel-head"><div><span className="eyebrow">BAND BY SKILL</span><h2>Your current profile</h2></div><BarChart3 size={19} /></div>{(Object.keys(skillMeta) as Skill[]).map((item) => { const meta = skillMeta[item]; return <div className="skill-line" key={item}><span><strong>{meta.label}</strong><small>{meta.score >= 6.5 ? "On track" : "Room to grow"}</small></span><ProgressBar value={(meta.score / 9) * 100} tone={meta.tone} /><b>{meta.score.toFixed(1)}</b></div>; })}</div><div className="panel goals"><div className="panel-head"><div><span className="eyebrow">NEXT MILESTONE</span><h2>Target band 7.0</h2></div><Target size={19} /></div><p>You are 0.5 band away. Prioritise Writing coherence and Listening accuracy in your next two sessions.</p><button className="primary" onClick={() => navigate("practice")}>Build a session <ArrowRight size={15} /></button></div></div><div className="panel profile-edit"><div><span className="eyebrow">PROFILE</span><h3>Personalise your dashboard</h3><p>Your name is stored only in this browser.</p></div><input value={progress.name} onChange={(event) => setProgress((old) => ({ ...old, name: event.target.value.slice(0, 24) }))} /></div></section>}
+      </div><footer><span>© 2026 ODIY English</span><span>Focused practice. Better English. <HeartIcon /></span><span>Built for ambitious learners</span></footer>
+    </main>
+  </div>;
 }
-
-function ArrowUpRightIcon() {
-  return <ArrowRight size={16} />;
-}
+function HeartIcon() { return <span className="heart">♥</span>; }
