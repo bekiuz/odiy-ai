@@ -59,7 +59,8 @@ export default function App() {
   const [tutorInput, setTutorInput] = useState("");
   const [tutorMessages, setTutorMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([{ role: "assistant", content: "Hi, I’m your ODIY AI tutor. Share an English sentence, essay paragraph, or IELTS question and I’ll give you practical feedback." }]);
   const [tutorLoading, setTutorLoading] = useState(false);
-  const [modelStatus, setModelStatus] = useState("Model hali yuklanmagan");\n  const [modelProgress, setModelProgress] = useState(0);
+  const [modelStatus, setModelStatus] = useState("Model hali yuklanmagan");
+  const [modelProgress, setModelProgress] = useState(0);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }, [progress]);
   useEffect(() => { if (!examRunning) return; const timer = window.setInterval(() => setSeconds((value) => value <= 1 ? (setExamRunning(false), 0) : value - 1), 1000); return () => window.clearInterval(timer); }, [examRunning]);
