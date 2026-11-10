@@ -38,6 +38,7 @@ jobs:
         run: npm run build
         env:
           GITHUB_PAGES: "true"
+          VITE_AI_API_URL: ${{ vars.VITE_AI_API_URL }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
