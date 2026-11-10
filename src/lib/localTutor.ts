@@ -1,7 +1,7 @@
 import { pipeline } from "@huggingface/transformers";
 
 export type TutorMessage = {
-  role: "system" | "user" | "assistant";
+  role: "user" | "assistant";
   content: string;
 };
 
@@ -20,8 +20,10 @@ type GenerationResult = {
   generated_text?: string | GeneratedMessage[];
 };
 
+type ModelMessage = TutorMessage | { role: "system"; content: string };
+
 type TextGenerator = (
-  messages: TutorMessage[],
+  messages: ModelMessage[],
   options: {
     max_new_tokens: number;
     temperature: number;
@@ -80,9 +82,9 @@ export async function generateTutorReply(
 ): Promise<string> {
   const generator = await getGenerator(onProgress);
 
-  const messages: TutorMessage[] = [
+  const messages: ModelMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
-    ...history.filter((message) => message.role !== "system").slice(-8),
+    ...history.slice(-8),
   ];
 
   const result = await generator(messages, {
