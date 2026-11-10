@@ -1,6 +1,12 @@
 # ODIY AI Tutor Worker
 
-This Worker connects the GitHub Pages frontend to the Gemini API. The Gemini key stays in a Cloudflare secret and is never exposed to the browser.
+This Worker connects the GitHub Pages frontend to the Gemini Interactions API. The Gemini key stays in a Cloudflare secret and is never exposed to the browser.
+
+## Runtime
+
+- Model: `gemini-3.8-flash`
+- API: `https://generativelanguage.googleapis.com/v1beta/interactions`
+- Conversation history is sent statelessly with `store: false`.
 
 ## Deploy
 
