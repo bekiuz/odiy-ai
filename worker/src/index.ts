@@ -1,28 +1,37 @@
-interface Env { GEMINI_API_KEY: string }
-type ChatMessage = { role: "user" | "assistant"; content: string };
+interface Env {
+  GEMINI_API_KEY: string;
+}
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
 
 const SYSTEM_PROMPT =
   "You are ODIY AI, a friendly and practical English tutor specialising in IELTS. Reply in the language the learner uses unless they ask otherwise. Correct English naturally, explain mistakes simply, give IELTS-aware feedback for Reading, Listening, Writing and Speaking, and finish with one practical next step. Never claim to provide an official IELTS score.";
 
-function cors(origin: string | null) {
-  const allowed = new Set([
-    "https://bekiuz.github.io",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ]);
-  const allowOrigin =
-    origin && allowed.has(origin) ? origin : "https://bekiuz.github.io";
+const ALLOWED_ORIGINS = new Set([
+  "https://bekiuz.github.io",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]);
+
+function cors(origin: string | null): Record<string, string> {
+  const allowedOrigin =
+    origin && ALLOWED_ORIGINS.has(origin)
+      ? origin
+      : "https://bekiuz.github.io";
 
   return {
-    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
-function json(data: unknown, status: number, origin: string | null) {
+function json(data: unknown, status: number, origin: string | null): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -82,26 +91,22 @@ export default {
         item.content.length <= 4000,
     );
 
-    if (!valid) {
+    if (!valid || !messages.some((item) => item.role === "user")) {
       return json(
-        { error: "Xabar formati noto‘g‘ri yoki juda uzun." },
+        { error: "Xabar formati noto‘g‘ri yoki foydalanuvchi xabari yo‘q." },
         400,
         origin,
       );
     }
 
-    // Interactions API uses user_input and model_output steps for stateless history.
-    const input = messages.slice(-12).map((item) =>
-      item.role === "assistant"
-        ? {
-            type: "model_output",
-            content: [{ type: "text", text: item.content }],
-          }
-        : {
-            type: "user_input",
-            content: [{ type: "text", text: item.content }],
-          },
-    );
+    const transcript = messages
+      .slice(-12)
+      .map((item) =>
+        item.role === "assistant"
+          ? "ODIY AI: " + item.content
+          : "Student: " + item.content,
+      )
+      .join("\n\n");
 
     try {
       const upstream = await fetch(
@@ -115,7 +120,9 @@ export default {
           body: JSON.stringify({
             model: "gemini-3.8-flash",
             system_instruction: SYSTEM_PROMPT,
-            input,
+            input:
+              "Continue this tutoring conversation. Answer the latest student message.\n\n" +
+              transcript,
             store: false,
           }),
         },
@@ -130,12 +137,17 @@ export default {
       };
 
       if (!upstream.ok) {
-        const message =
-          result.error?.message ||
-          (upstream.status === 429
-            ? "Gemini foydalanish limiti vaqtincha tugadi. Keyinroq urinib ko‘ring."
-            : "Gemini API so‘rovni qabul qilmadi.");
-        return json({ error: message }, upstream.status, origin);
+        return json(
+          {
+            error:
+              result.error?.message ||
+              "Gemini API so‘rovni qabul qilmadi (HTTP " +
+                upstream.status +
+                ").",
+          },
+          upstream.status,
+          origin,
+        );
       }
 
       const reply = result.steps
@@ -147,11 +159,7 @@ export default {
         .trim();
 
       if (!reply) {
-        return json(
-          { error: "Gemini javobi bo‘sh qaytdi." },
-          502,
-          origin,
-        );
+        return json({ error: "Gemini javobi bo‘sh qaytdi." }, 502, origin);
       }
 
       return json({ reply, mode: "gemini-3.8-flash" }, 200, origin);
